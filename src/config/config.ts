@@ -13,6 +13,7 @@ export interface Config {
   serverUrl: string;
   password: string;
   budgetId: string;
+  e2ePassword?: string;
   accountMappings: AccountMapping[];
 }
 

@@ -35,11 +35,29 @@ export async function setupCommand(): Promise<void> {
   });
   if (p.isCancel(budgetId)) return process.exit(0);
 
+  const hasE2e = await p.confirm({
+    message: "Is end-to-end encryption enabled?",
+  });
+  if (p.isCancel(hasE2e)) return process.exit(0);
+
+  let e2ePassword: string | undefined;
+  if (hasE2e) {
+    const e2eInput = await p.password({
+      message: "End-to-end encryption password:",
+      validate: (val) => {
+        if (!val) return "Encryption password is required";
+      },
+    });
+    if (p.isCancel(e2eInput)) return process.exit(0);
+    e2ePassword = e2eInput;
+  }
+
   // Connect and fetch accounts
   const tempConfig: Config = {
     serverUrl,
     password,
     budgetId,
+    e2ePassword,
     accountMappings: [],
   };
 
@@ -125,6 +143,7 @@ export async function setupCommand(): Promise<void> {
     serverUrl,
     password,
     budgetId,
+    e2ePassword,
     accountMappings,
   };
 
