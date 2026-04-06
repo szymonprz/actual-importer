@@ -1,6 +1,6 @@
 import { parse } from "csv-parse/sync";
 import * as iconv from "iconv-lite";
-import type { BankParser, Transaction } from "../types.js";
+import type { BankParser, ParseResult } from "../types.js";
 
 const DATA_ROW_START_MARKER = "Data transakcji";
 
@@ -27,12 +27,32 @@ function findDataStartLine(lines: string[]): number {
   );
 }
 
+function extractSourceAccount(lines: string[]): string {
+  // ING CSV has the source account on the line after "Wybrane rachunki:"
+  // Format: "KONTO Direct (PLN)";;"10 1050 1461 1000 0097 0488 6994";
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes("Wybrane rachunki")) {
+      const accountLine = lines[i + 1];
+      if (accountLine) {
+        const parts = accountLine.split(";");
+        // Account number is in the 3rd field (index 2)
+        const raw = parts[2];
+        const cleaned = cleanAccountNumber(raw?.replace(/"/g, ""));
+        if (cleaned) return cleaned;
+      }
+    }
+  }
+  throw new Error("ING CSV: could not find source account number");
+}
+
 export class IngParser implements BankParser {
   bankId = "ing";
 
-  parse(csvBuffer: Buffer): Transaction[] {
+  parse(csvBuffer: Buffer): ParseResult {
     const content = iconv.decode(csvBuffer, "cp1250");
     const lines = content.split("\n");
+
+    const sourceAccountNumber = extractSourceAccount(lines);
 
     const dataStart = findDataStartLine(lines);
     const dataLines = lines
@@ -40,7 +60,7 @@ export class IngParser implements BankParser {
       .filter((line) => line.trim().length > 0 && !line.startsWith('"Dokument'));
 
     if (dataLines.length === 0) {
-      return [];
+      return { sourceAccountNumber, transactions: [] };
     }
 
     const csvData = dataLines.join("\n");
@@ -51,8 +71,13 @@ export class IngParser implements BankParser {
       skip_empty_lines: true,
     }) as string[][];
 
-    return records
-      .filter((row) => row.length >= 9 && row[0].match(/^\d{4}-\d{2}-\d{2}$/))
+    const transactions = records
+      .filter((row) => {
+        if (row.length < 9 || !row[0].match(/^\d{4}-\d{2}-\d{2}$/)) return false;
+        // Skip pending transactions (empty booking date) — they'll appear as booked later
+        if (!row[1]?.trim()) return false;
+        return true;
+      })
       .map((row) => {
         const date = row[0]; // YYYY-MM-DD already
         const payee = (row[2] || "").trim();
@@ -68,5 +93,7 @@ export class IngParser implements BankParser {
           counterpartyAccount,
         };
       });
+
+    return { sourceAccountNumber, transactions };
   }
 }

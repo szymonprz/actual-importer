@@ -40,17 +40,6 @@ export async function importCommand(args: ImportArgs): Promise<void> {
 
   const config = await loadConfig();
 
-  // Find the account mapping for this bank
-  const sourceMapping = config.accountMappings.find(
-    (m) => m.bank === args.bank
-  );
-  if (!sourceMapping) {
-    console.error(
-      `No account mapping found for bank '${args.bank}'. Run \`actual-importer setup\` to configure.`
-    );
-    process.exit(1);
-  }
-
   // Read CSV file
   let csvData: Buffer;
   try {
@@ -75,16 +64,29 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     process.exit(1);
   }
 
-  if (parsed.length === 0) {
+  // Find account mapping by source account number from CSV
+  const sourceAccountNumber = parsed.sourceAccountNumber;
+  const sourceMapping = config.accountMappings.find(
+    (m) => m.bankAccountNumber === sourceAccountNumber
+  );
+  if (!sourceMapping) {
+    console.error(
+      `No account mapping found for bank account '${sourceAccountNumber}'.\n` +
+        `Run \`actual-importer setup\` to configure this account.`
+    );
+    process.exit(1);
+  }
+
+  if (parsed.transactions.length === 0) {
     console.log(formatSummary(createEmptySummary(), args.dryRun));
     return;
   }
 
   // Build Actual transactions
   const summary: ImportSummary = createEmptySummary();
-  const transactionsByAccount = new Map<string, ActualTransaction[]>();
+  const actualTransactions: ActualTransaction[] = [];
 
-  for (const tx of parsed) {
+  for (const tx of parsed.transactions) {
     const importedId = computeImportedId(
       tx.date,
       tx.amount,
@@ -109,15 +111,11 @@ export async function importCommand(args: ImportArgs): Promise<void> {
       summary.transfers++;
     }
 
-    const accountId = sourceMapping.actualAccountId;
-    if (!transactionsByAccount.has(accountId)) {
-      transactionsByAccount.set(accountId, []);
-    }
-    transactionsByAccount.get(accountId)!.push(actualTx);
+    actualTransactions.push(actualTx);
   }
 
   if (args.dryRun) {
-    summary.imported = parsed.length;
+    summary.imported = parsed.transactions.length;
     console.log(formatSummary(summary, true));
     return;
   }
@@ -126,13 +124,14 @@ export async function importCommand(args: ImportArgs): Promise<void> {
   try {
     await connect(config);
 
-    for (const [accountId, transactions] of transactionsByAccount) {
-      const result = await importTransactions(accountId, transactions);
-      summary.imported += result.added.length;
-      summary.skipped += transactions.length - result.added.length;
-      for (const error of result.errors) {
-        summary.errors.push(error.message);
-      }
+    const result = await importTransactions(
+      sourceMapping.actualAccountId,
+      actualTransactions
+    );
+    summary.imported += result.added.length;
+    summary.skipped += actualTransactions.length - result.added.length;
+    for (const error of result.errors) {
+      summary.errors.push(error.message);
     }
 
     console.log(formatSummary(summary, false));

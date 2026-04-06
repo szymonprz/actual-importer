@@ -1,5 +1,5 @@
 import { parse } from "csv-parse/sync";
-import type { BankParser, Transaction } from "../types.js";
+import type { BankParser, ParseResult } from "../types.js";
 
 function parseDate(raw: string): string {
   // Santander uses DD-MM-YYYY format, convert to YYYY-MM-DD
@@ -24,7 +24,7 @@ function cleanAccountNumber(raw: string | undefined): string | undefined {
 export class SantanderParser implements BankParser {
   bankId = "santander";
 
-  parse(csvContent: string | Buffer): Transaction[] {
+  parse(csvContent: string | Buffer): ParseResult {
     const content =
       typeof csvContent === "string"
         ? csvContent
@@ -38,13 +38,17 @@ export class SantanderParser implements BankParser {
     }) as string[][];
 
     if (records.length < 2) {
-      return [];
+      return { sourceAccountNumber: "", transactions: [] };
     }
 
-    // First row is the header metadata row, skip it
+    // First row is the header metadata row
+    // Columns: GenerationDate, FromDate, AccountNumber, Owner, Currency, OpenBalance, CloseBalance, Count
+    const headerRow = records[0];
+    const sourceAccountNumber = cleanAccountNumber(headerRow[2]) || "";
+
     const dataRows = records.slice(1);
 
-    return dataRows
+    const transactions = dataRows
       .filter((row) => row.length >= 7)
       .map((row) => {
         // Columns: BookingDate, OperationDate, Title, Counterparty, CounterpartyAccount, Amount, Balance, RowNr
@@ -62,5 +66,7 @@ export class SantanderParser implements BankParser {
           counterpartyAccount,
         };
       });
+
+    return { sourceAccountNumber, transactions };
   }
 }

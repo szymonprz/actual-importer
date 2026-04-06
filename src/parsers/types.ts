@@ -6,7 +6,12 @@ export interface Transaction {
   counterpartyAccount?: string;
 }
 
+export interface ParseResult {
+  sourceAccountNumber: string;
+  transactions: Transaction[];
+}
+
 export interface BankParser {
   bankId: string;
-  parse(csvContent: string | Buffer): Transaction[];
+  parse(csvContent: string | Buffer): ParseResult;
 }

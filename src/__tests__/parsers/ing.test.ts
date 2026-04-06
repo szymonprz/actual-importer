@@ -15,22 +15,28 @@ describe("IngParser", () => {
     expect(parser.bankId).toBe("ing");
   });
 
+  it("should extract source account number", () => {
+    const buffer = readFileSync(fixturePath);
+    const result = parser.parse(buffer);
+    expect(result.sourceAccountNumber).toBe("11000022223333444455556666");
+  });
+
   it("should parse all transactions from fixture", () => {
     const buffer = readFileSync(fixturePath);
-    const transactions = parser.parse(buffer);
-    expect(transactions).toHaveLength(5);
+    const result = parser.parse(buffer);
+    expect(result.transactions).toHaveLength(5);
   });
 
   it("should parse dates in YYYY-MM-DD format", () => {
     const buffer = readFileSync(fixturePath);
-    const transactions = parser.parse(buffer);
+    const { transactions } = parser.parse(buffer);
     expect(transactions[0].date).toBe("2026-04-01");
     expect(transactions[4].date).toBe("2026-04-05");
   });
 
   it("should parse amounts correctly", () => {
     const buffer = readFileSync(fixturePath);
-    const transactions = parser.parse(buffer);
+    const { transactions } = parser.parse(buffer);
     expect(transactions[0].amount).toBe(-45.5);
     expect(transactions[2].amount).toBe(1500);
     expect(transactions[3].amount).toBe(-7000);
@@ -38,14 +44,14 @@ describe("IngParser", () => {
 
   it("should extract payee names trimmed", () => {
     const buffer = readFileSync(fixturePath);
-    const transactions = parser.parse(buffer);
+    const { transactions } = parser.parse(buffer);
     expect(transactions[0].payee).toBe("Sklep Testowy");
     expect(transactions[2].payee).toBe("Firma Przykład Sp. z o.o.");
   });
 
   it("should extract counterparty account when present", () => {
     const buffer = readFileSync(fixturePath);
-    const transactions = parser.parse(buffer);
+    const { transactions } = parser.parse(buffer);
     expect(transactions[0].counterpartyAccount).toBe(
       "22000033334444555566667777"
     );
@@ -56,12 +62,12 @@ describe("IngParser", () => {
 
   it("should have undefined counterparty for card payments", () => {
     const buffer = readFileSync(fixturePath);
-    const transactions = parser.parse(buffer);
+    const { transactions } = parser.parse(buffer);
     expect(transactions[2].counterpartyAccount).toBeUndefined();
     expect(transactions[4].counterpartyAccount).toBeUndefined();
   });
 
-  it("should return empty array for CSV with no data rows", () => {
+  it("should return empty transactions for CSV with no data rows", () => {
     const header = `"Lista transakcji";;;;;"ING Bank";;;;;;;;;;;;;;;
 "Dokument nr 999";
 "Wygenerowany dnia: 2026-04-06";;;;;;;;;;;;;;;;;;;;
@@ -86,7 +92,8 @@ describe("IngParser", () => {
 "Dokument ma charakter informacyjny";
 `;
     const buffer = iconv.encode(header, "cp1250");
-    const transactions = parser.parse(buffer);
-    expect(transactions).toHaveLength(0);
+    const result = parser.parse(buffer);
+    expect(result.transactions).toHaveLength(0);
+    expect(result.sourceAccountNumber).toBe("11000022223333444455556666");
   });
 });
