@@ -1,0 +1,43 @@
+{
+  "name": "actual-importer",
+  "version": "0.1.0",
+  "description": "CLI tool to import bank transactions from Polish banks into Actual Budget",
+  "type": "module",
+  "bin": {
+    "actual-importer": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "actual-budget",
+    "bank-import",
+    "cli",
+    "ing",
+    "santander"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@actual-app/api": "^25.3.1",
+    "@clack/prompts": "^0.10.0",
+    "csv-parse": "^5.6.0",
+    "iconv-lite": "^0.7.2",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/yargs": "^17.0.33",
+    "@typescript-eslint/eslint-plugin": "^8.24.0",
+    "@typescript-eslint/parser": "^8.24.0",
+    "eslint": "^9.19.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
