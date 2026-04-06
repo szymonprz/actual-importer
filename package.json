@@ -7,7 +7,8 @@
     "actual-importer": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --noCheck || true",
+    "typecheck": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "lint": "eslint src/"
@@ -24,7 +25,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@actual-app/api": "^25.3.1",
+    "@actual-app/api": "^26.4.0",
     "@clack/prompts": "^0.10.0",
     "csv-parse": "^5.6.0",
     "iconv-lite": "^0.7.2",

@@ -1,5 +1,8 @@
+import { mkdirSync, existsSync } from "node:fs";
 import * as api from "@actual-app/api";
 import type { Config } from "../config/config.js";
+
+const DATA_DIR = "/tmp/actual-importer-data";
 
 export interface ActualAccount {
   id: string;
@@ -24,12 +27,17 @@ export interface ImportResult {
 }
 
 export async function connect(config: Config): Promise<void> {
+  if (!existsSync(DATA_DIR)) {
+    mkdirSync(DATA_DIR, { recursive: true });
+  }
   await api.init({
-    dataDir: "/tmp/actual-importer-data",
+    dataDir: DATA_DIR,
     serverURL: config.serverUrl,
     password: config.password,
   });
-  await api.loadBudget(config.budgetId);
+  await api.downloadBudget(config.budgetId, {
+    password: config.e2ePassword,
+  });
 }
 
 export async function disconnect(): Promise<void> {
