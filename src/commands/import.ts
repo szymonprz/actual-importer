@@ -39,6 +39,8 @@ interface ImportArgs {
   file: string;
   bank: string;
   dryRun: boolean;
+  from?: string;
+  to?: string;
 }
 
 export async function importCommand(args: ImportArgs): Promise<void> {
@@ -80,6 +82,17 @@ export async function importCommand(args: ImportArgs): Promise<void> {
       error instanceof Error ? error.message : error
     );
     process.exit(1);
+  }
+
+  const total = parsed.transactions.length;
+  parsed.transactions = parsed.transactions.filter(
+    (tx) =>
+      (!args.from || tx.date >= args.from) && (!args.to || tx.date <= args.to)
+  );
+  if (parsed.transactions.length < total) {
+    console.log(
+      `Date filter: importing ${parsed.transactions.length} of ${total} transactions.`
+    );
   }
 
   if (parsed.transactions.length === 0) {

@@ -87,6 +87,16 @@ account, a joint account, savings) and money moving between them is recorded as
 a transfer. The rest are remembered so you're not asked again. In a
 non-interactive shell, an unmapped source account is an error.
 
+#### Date range
+
+Skip transactions outside a range, e.g. history from before your budget's start date:
+
+```bash
+actual-importer import --file transactions.csv --bank ing --from 2026-01-01
+```
+
+`--to` works the same way. Both dates are inclusive.
+
 #### Dry-run mode
 
 Preview what would be imported without writing to Actual Budget:

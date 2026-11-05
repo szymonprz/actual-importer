@@ -19,7 +19,7 @@ actual-importer is a CLI tool (Node.js + TypeScript) that imports bank transacti
 ### CLI Commands
 
 - `setup` — interactive wizard for the connection (server URL, password, budget picked from a list, E2E password); saves to the JSON config or `./.env`
-- `import --file <path> --bank <id> [--dry-run]` — parse CSV, detect transfers, deduplicate, and import. Prompts (TTY only) to map an unmapped source account and frequent unmapped counterparty accounts
+- `import --file <path> --bank <id> [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--dry-run]` — parse CSV, detect transfers, deduplicate, and import. Prompts (TTY only) to map an unmapped source account and frequent unmapped counterparty accounts
 - `accounts` — list Actual Budget accounts from the configured budget
 
 ### Bank Parser Interface
