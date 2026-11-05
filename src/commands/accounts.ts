@@ -1,15 +1,15 @@
-import { configExists, loadConfig } from "../config/config.js";
+import { loadConfig, type Config } from "../config/config.js";
 import { connect, disconnect, getAccounts } from "../services/actual.js";
+import { formatAccountNumber } from "../services/account-mapping.js";
 
 export async function accountsCommand(): Promise<void> {
-  if (!configExists()) {
-    console.error(
-      "Configuration not found. Run `actual-importer setup` first."
-    );
+  let config: Config;
+  try {
+    config = await loadConfig();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   }
-
-  const config = await loadConfig();
 
   try {
     await connect(config);
@@ -18,6 +18,11 @@ export async function accountsCommand(): Promise<void> {
     console.log("\nActual Budget accounts:\n");
     for (const account of accounts) {
       console.log(`  ${account.id}  ${account.name}`);
+      for (const m of config.accountMappings) {
+        if (m.actualAccountId === account.id) {
+          console.log(`      ← ${formatAccountNumber(m.bankAccountNumber)}${m.bank ? ` (${m.bank})` : ""}`);
+        }
+      }
     }
     console.log();
   } catch (error) {
@@ -25,7 +30,7 @@ export async function accountsCommand(): Promise<void> {
       "Failed to connect to Actual Budget:",
       error instanceof Error ? error.message : error
     );
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await disconnect();
   }

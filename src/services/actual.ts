@@ -1,6 +1,6 @@
 import { mkdirSync, existsSync } from "node:fs";
 import * as api from "@actual-app/api";
-import type { Config } from "../config/config.js";
+import type { ConnectionConfig } from "../config/config.js";
 
 const DATA_DIR = "/tmp/actual-importer-data";
 
@@ -36,15 +36,40 @@ export interface ImportResult {
   errors: Array<{ message: string }>;
 }
 
-export async function connect(config: Config): Promise<void> {
+export interface RemoteBudget {
+  syncId: string;
+  name: string;
+  encrypted: boolean;
+}
+
+async function initServer(serverUrl: string, password: string): Promise<void> {
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
-  await api.init({
-    dataDir: DATA_DIR,
-    serverURL: config.serverUrl,
-    password: config.password,
-  });
+  await api.init({ dataDir: DATA_DIR, serverURL: serverUrl, password });
+}
+
+/** Log in and list budgets on the server. Leaves the API initialised; call disconnect(). */
+export async function listBudgets(
+  serverUrl: string,
+  password: string
+): Promise<RemoteBudget[]> {
+  await initServer(serverUrl, password);
+  const files = await api.getBudgets();
+  const bySyncId = new Map<string, RemoteBudget>();
+  for (const f of files as Array<{ groupId?: string; name: string; encryptKeyId?: string | null }>) {
+    if (!f.groupId || bySyncId.has(f.groupId)) continue;
+    bySyncId.set(f.groupId, {
+      syncId: f.groupId,
+      name: f.name,
+      encrypted: Boolean(f.encryptKeyId),
+    });
+  }
+  return [...bySyncId.values()];
+}
+
+export async function connect(config: ConnectionConfig): Promise<void> {
+  await initServer(config.serverUrl, config.password);
   await api.downloadBudget(config.budgetId, {
     password: config.e2ePassword,
   });

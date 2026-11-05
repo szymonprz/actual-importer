@@ -33,6 +33,23 @@ yargs(hideBin(process.argv))
           describe: "Bank identifier (e.g. ing, santander)",
           demandOption: true,
         })
+        .option("from", {
+          type: "string",
+          describe: "Only import transactions on or after this date (YYYY-MM-DD)",
+        })
+        .option("to", {
+          type: "string",
+          describe: "Only import transactions on or before this date (YYYY-MM-DD)",
+        })
+        .check((argv) => {
+          for (const key of ["from", "to"] as const) {
+            const v = argv[key];
+            if (v !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+              throw new Error(`--${key} must be a date in YYYY-MM-DD format`);
+            }
+          }
+          return true;
+        })
         .option("dry-run", {
           type: "boolean",
           describe: "Preview import without writing to Actual Budget",
@@ -43,6 +60,8 @@ yargs(hideBin(process.argv))
         file: argv.file,
         bank: argv.bank,
         dryRun: argv.dryRun,
+        from: argv.from,
+        to: argv.to,
       });
     }
   )
