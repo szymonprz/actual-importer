@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      # Batch all non-breaking updates into a single PR that can be auto-merged.
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Keep @types/node aligned with the Node major in .tool-versions.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint does not support TypeScript 7 yet (peer: <6.1.0).
+      - dependency-name: typescript
+        versions: [">=7.0.0"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]

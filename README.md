@@ -17,7 +17,7 @@ CLI tool to import bank transaction history from Polish banks into [Actual Budge
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 22.12
 - A self-hosted [Actual Budget](https://actualbudget.org/) server
 
 ## Installation

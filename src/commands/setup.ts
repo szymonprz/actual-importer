@@ -70,7 +70,7 @@ export async function setupCommand(): Promise<void> {
     accounts = await getAccounts();
     spinner.stop("Connected successfully");
   } catch (error) {
-    spinner.stop("Connection failed");
+    spinner.error("Connection failed");
     p.log.error(
       `Failed to connect: ${error instanceof Error ? error.message : error}`
     );
