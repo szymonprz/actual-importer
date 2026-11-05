@@ -6,10 +6,24 @@ import { detectTransfer } from "../services/transfer-detector.js";
 import {
   connect,
   disconnect,
+  getAccounts,
+  getTransferPayees,
+  findTransactions,
+  findByImportedIds,
   importTransactions,
+  linkTransfer,
+  updateTransaction,
   amountToInteger,
 } from "../services/actual.js";
-import type { ActualTransaction } from "../services/actual.js";
+import type {
+  ActualTransaction,
+  ExistingTransaction,
+} from "../services/actual.js";
+import {
+  pickCounterpart,
+  shiftDate,
+  TRANSFER_DATE_WINDOW_DAYS,
+} from "../services/transfer-matcher.js";
 import {
   createEmptySummary,
   formatSummary,
@@ -82,66 +96,179 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     return;
   }
 
-  // Build Actual transactions
   const summary: ImportSummary = createEmptySummary();
-  const actualTransactions: ActualTransaction[] = [];
 
-  for (const tx of parsed.transactions) {
-    const importedId = computeImportedId(
-      tx.date,
-      tx.amount,
-      tx.description,
-      sourceMapping.bankAccountNumber
-    );
-
-    const transfer = detectTransfer(tx, config.accountMappings);
-
-    const actualTx: ActualTransaction = {
-      date: tx.date,
-      amount: amountToInteger(tx.amount),
-      payee_name: tx.payee || undefined,
-      imported_payee: tx.payee || undefined,
-      notes: tx.description || undefined,
-      imported_id: importedId,
-      cleared: true,
-    };
-
-    if (transfer.isTransfer && transfer.targetActualAccountId) {
-      actualTx.transfer_id = transfer.targetActualAccountId;
-      summary.transfers++;
-    }
-
-    actualTransactions.push(actualTx);
-  }
-
-  if (args.dryRun) {
-    summary.imported = parsed.transactions.length;
-    console.log(formatSummary(summary, true));
-    return;
-  }
-
-  // Import to Actual Budget
   try {
+    // Connect in dry-run too: it's read-only and lets us report exactly what
+    // would be skipped, and which transfers would be linked vs. created.
     await connect(config);
 
-    const result = await importTransactions(
-      sourceMapping.actualAccountId,
-      actualTransactions
+    const accounts = await getAccounts();
+    const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+    const accountIds = new Set(accountNames.keys());
+    const transferPayees = await getTransferPayees();
+    const sourceAccountId = sourceMapping.actualAccountId;
+
+    const planned = parsed.transactions.map((tx) => ({
+      tx,
+      importedId: computeImportedId(
+        tx.date,
+        tx.amount,
+        tx.description,
+        sourceMapping.bankAccountNumber
+      ),
+      amount: amountToInteger(tx.amount),
+      transfer: detectTransfer(tx, config.accountMappings),
+    }));
+
+    const alreadyImported = await findByImportedIds(
+      sourceAccountId,
+      planned.map((p) => p.importedId)
     );
+
+    const actualTransactions: ActualTransaction[] = [];
+    // imported_id of the new transaction -> existing transaction to link it to
+    const pendingLinks = new Map<string, ExistingTransaction>();
+    const claimed = new Set<string>();
+    const transferLines: string[] = [];
+    const adoptions: Array<{ id: string; tx: ActualTransaction }> = [];
+
+    for (const p of planned) {
+      const actualTx: ActualTransaction = {
+        date: p.tx.date,
+        amount: p.amount,
+        imported_payee: p.tx.payee || undefined,
+        notes: p.tx.description || undefined,
+        imported_id: p.importedId,
+        cleared: true,
+      };
+      const isNew = !alreadyImported.has(p.importedId);
+      const target = p.transfer.targetActualAccountId;
+
+      if (p.transfer.isTransfer && target && target !== sourceAccountId) {
+        if (isNew) summary.transfers++;
+        const label = `${p.tx.date}  ${(p.amount / 100).toFixed(2).padStart(10)}  → ${accountNames.get(target) ?? target}`;
+
+        // The transfer may already exist on this side, auto-created by Actual
+        // when the other bank's CSV was imported. Adopt it instead of adding
+        // a duplicate.
+        const autoCreated = isNew
+          ? (
+              await findTransactions({
+                account: sourceAccountId,
+                amount: p.amount,
+                dateFrom: shiftDate(p.tx.date, -TRANSFER_DATE_WINDOW_DAYS),
+                dateTo: shiftDate(p.tx.date, TRANSFER_DATE_WINDOW_DAYS),
+              })
+            ).find(
+              (t) =>
+                t.imported_id === null &&
+                t.transfer_id !== null &&
+                !accountIds.has(t.transfer_id) &&
+                !claimed.has(t.id)
+            )
+          : undefined;
+        if (autoCreated) {
+          claimed.add(autoCreated.id);
+          adoptions.push({ id: autoCreated.id, tx: actualTx });
+          transferLines.push(`  ${label}  already in Actual (${autoCreated.date}), marking as imported`);
+          continue;
+        }
+
+        const counterpart = isNew
+          ? pickCounterpart(
+              { date: p.tx.date, amount: p.amount },
+              await findTransactions({
+                account: target,
+                amount: -p.amount,
+                dateFrom: shiftDate(p.tx.date, -TRANSFER_DATE_WINDOW_DAYS),
+                dateTo: shiftDate(p.tx.date, TRANSFER_DATE_WINDOW_DAYS),
+              }),
+              claimed,
+              accountIds
+            )
+          : undefined;
+
+        if (counterpart) {
+          // The other side is already in Actual (e.g. imported from the other
+          // bank's CSV). Import this one without a payee, then link the two.
+          claimed.add(counterpart.id);
+          pendingLinks.set(p.importedId, counterpart);
+          transferLines.push(`  ${label}  link to existing (${counterpart.date})`);
+        } else {
+          // Actual creates the other side automatically for transfer payees.
+          actualTx.payee = transferPayees.get(target);
+          if (isNew) transferLines.push(`  ${label}  new transfer`);
+        }
+      } else {
+        actualTx.payee_name = p.tx.payee || undefined;
+      }
+
+      actualTransactions.push(actualTx);
+    }
+
+    if (args.dryRun) {
+      summary.skipped = alreadyImported.size + adoptions.length;
+      summary.imported = actualTransactions.length - alreadyImported.size;
+      printTransfers(transferLines);
+      console.log(formatSummary(summary, true));
+      return;
+    }
+
+    for (const { id, tx } of adoptions) {
+      await updateTransaction(id, {
+        imported_id: tx.imported_id,
+        imported_payee: tx.imported_payee,
+        cleared: true,
+      });
+      summary.skipped++;
+    }
+
+    const result = await importTransactions(sourceAccountId, actualTransactions);
     summary.imported += result.added.length;
     summary.skipped += actualTransactions.length - result.added.length;
     for (const error of result.errors) {
       summary.errors.push(error.message);
     }
 
+    if (pendingLinks.size > 0) {
+      const added = new Set(result.added);
+      const newIds = await findByImportedIds(sourceAccountId, [
+        ...pendingLinks.keys(),
+      ]);
+      for (const [importedId, counterpart] of pendingLinks) {
+        const id = newIds.get(importedId);
+        if (!id || !added.has(id)) continue;
+        try {
+          await linkTransfer(
+            { id: counterpart.id, account: counterpart.account },
+            { id, account: sourceAccountId },
+            transferPayees
+          );
+        } catch (error) {
+          summary.errors.push(
+            `Failed to link transfer ${importedId.slice(0, 8)}: ${error instanceof Error ? error.message : error}`
+          );
+        }
+      }
+    }
+
+    printTransfers(transferLines);
     console.log(formatSummary(summary, false));
   } catch (error) {
     console.error(
       "Failed to import transactions:",
       error instanceof Error ? error.message : error
     );
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await disconnect();
   }
+}
+
+function printTransfers(lines: string[]): void {
+  if (lines.length === 0) return;
+  console.log("Transfers:");
+  for (const line of lines) console.log(line);
+  console.log("");
 }
