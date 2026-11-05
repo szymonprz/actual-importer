@@ -2,16 +2,16 @@ import { parse } from "csv-parse/sync";
 import type { BankParser, ParseResult } from "../types.js";
 
 function parseDate(raw: string): string {
-  // Santander uses DD-MM-YYYY format, convert to YYYY-MM-DD
+  // Erste uses DD-MM-YYYY format, convert to YYYY-MM-DD
   const parts = raw.split("-");
   if (parts.length !== 3) {
-    throw new Error(`Santander CSV: invalid date format '${raw}'`);
+    throw new Error(`Erste CSV: invalid date format '${raw}'`);
   }
   return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
 
 function parseAmount(raw: string): number {
-  // Santander uses comma as decimal separator, e.g. "-439,03"
+  // Erste uses comma as decimal separator, e.g. "-439,03"
   return parseFloat(raw.replace(",", "."));
 }
 
@@ -21,8 +21,9 @@ function cleanAccountNumber(raw: string | undefined): string | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
-export class SantanderParser implements BankParser {
-  bankId = "santander";
+/** Erste Bank Polska (formerly Santander Bank Polska) — same CSV format. */
+export class ErsteParser implements BankParser {
+  bankId = "erste";
 
   parse(csvContent: string | Buffer): ParseResult {
     const content =

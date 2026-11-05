@@ -6,7 +6,7 @@ import {
 } from "../services/account-mapping.js";
 import { canPrompt, promptCounterpartyMappings, promptSourceMapping } from "./mapping-prompts.js";
 import { getParser, getAvailableBankIds } from "../parsers/registry.js";
-import { computeImportedId } from "../services/deduplication.js";
+import { computeImportedIds } from "../services/deduplication.js";
 import { detectTransfer } from "../services/transfer-detector.js";
 import {
   connect,
@@ -150,14 +150,13 @@ export async function importCommand(args: ImportArgs): Promise<void> {
       );
     }
 
-    const planned = parsed.transactions.map((tx) => ({
+    const importedIds = computeImportedIds(
+      parsed.transactions,
+      sourceBankAccountNumber
+    );
+    const planned = parsed.transactions.map((tx, i) => ({
       tx,
-      importedId: computeImportedId(
-        tx.date,
-        tx.amount,
-        tx.description,
-        sourceBankAccountNumber
-      ),
+      importedId: importedIds[i],
       amount: amountToInteger(tx.amount),
       transfer: detectTransfer(tx, config.accountMappings),
     }));
