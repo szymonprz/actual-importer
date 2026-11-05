@@ -1,5 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { configExists, loadConfig } from "../config/config.js";
+import { loadConfig, type Config } from "../config/config.js";
+import {
+  findMapping,
+  findUnmappedCounterparties,
+} from "../services/account-mapping.js";
+import { canPrompt, promptCounterpartyMappings, promptSourceMapping } from "./mapping-prompts.js";
 import { getParser, getAvailableBankIds } from "../parsers/registry.js";
 import { computeImportedId } from "../services/deduplication.js";
 import { detectTransfer } from "../services/transfer-detector.js";
@@ -37,13 +42,6 @@ interface ImportArgs {
 }
 
 export async function importCommand(args: ImportArgs): Promise<void> {
-  if (!configExists()) {
-    console.error(
-      "Configuration not found. Run `actual-importer setup` first."
-    );
-    process.exit(1);
-  }
-
   const parser = getParser(args.bank);
   if (!parser) {
     console.error(
@@ -52,7 +50,13 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     process.exit(1);
   }
 
-  const config = await loadConfig();
+  let config: Config;
+  try {
+    config = await loadConfig();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 
   // Read CSV file
   let csvData: Buffer;
@@ -78,19 +82,6 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     process.exit(1);
   }
 
-  // Find account mapping by source account number from CSV
-  const sourceAccountNumber = parsed.sourceAccountNumber;
-  const sourceMapping = config.accountMappings.find(
-    (m) => m.bankAccountNumber === sourceAccountNumber
-  );
-  if (!sourceMapping) {
-    console.error(
-      `No account mapping found for bank account '${sourceAccountNumber}'.\n` +
-        `Run \`actual-importer setup\` to configure this account.`
-    );
-    process.exit(1);
-  }
-
   if (parsed.transactions.length === 0) {
     console.log(formatSummary(createEmptySummary(), args.dryRun));
     return;
@@ -107,7 +98,44 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
     const accountIds = new Set(accountNames.keys());
     const transferPayees = await getTransferPayees();
+
+    // Map the CSV's own account, asking the user if it's new.
+    const sourceAccountNumber = parsed.sourceAccountNumber;
+    let sourceMapping = findMapping(sourceAccountNumber, config.accountMappings);
+    if (!sourceMapping && canPrompt()) {
+      sourceMapping = await promptSourceMapping(
+        config,
+        sourceAccountNumber,
+        args.bank,
+        accounts
+      );
+    }
+    if (!sourceMapping) {
+      console.error(
+        `No Actual account mapped for bank account '${sourceAccountNumber}'.\n` +
+          "Run the import in an interactive terminal to map it."
+      );
+      process.exitCode = 1;
+      return;
+    }
     const sourceAccountId = sourceMapping.actualAccountId;
+    const sourceBankAccountNumber = sourceMapping.bankAccountNumber;
+
+    // Offer unknown counterparty accounts — some may be the user's own.
+    if (canPrompt()) {
+      await promptCounterpartyMappings(
+        config,
+        findUnmappedCounterparties(
+          parsed.transactions,
+          sourceAccountNumber,
+          config.accountMappings,
+          config.ignoredCounterparties ?? [],
+          2 // one-off payees are almost never your own accounts
+        ),
+        accounts,
+        12
+      );
+    }
 
     const planned = parsed.transactions.map((tx) => ({
       tx,
@@ -115,7 +143,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
         tx.date,
         tx.amount,
         tx.description,
-        sourceMapping.bankAccountNumber
+        sourceBankAccountNumber
       ),
       amount: amountToInteger(tx.amount),
       transfer: detectTransfer(tx, config.accountMappings),

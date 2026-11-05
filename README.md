@@ -34,20 +34,39 @@ npx actual-importer
 
 ## Usage
 
-### 1. Setup
+### 1. Connect to Actual
 
-Run the interactive setup wizard to configure your Actual Budget server and map bank accounts:
+The importer needs four settings. Pick whichever way suits you:
+
+**Option A — `.env` file** (handy when working from this repo):
+
+```bash
+cp .env.example .env   # then fill in the values
+```
+
+**Option B — setup wizard:**
 
 ```bash
 actual-importer setup
 ```
 
-The wizard will:
-1. Ask for your Actual Budget server URL, API password, and budget ID
-2. Connect and fetch your accounts
-3. Let you map bank account numbers to Actual Budget accounts
+It logs in, lets you pick the budget from a list (no need to look up the sync ID),
+asks for the encryption password only if the budget is encrypted, checks that the
+budget opens, and saves either to `~/.actual-importer/config.json` or to `./.env`.
+Re-running it pre-fills your current values.
 
-Configuration is saved to `~/.actual-importer/config.json`.
+| Setting | Env var | Where to find it |
+|---|---|---|
+| Server URL | `ACTUAL_SERVER_URL` | Your Actual server address |
+| Password | `ACTUAL_PASSWORD` | The password you log into Actual with |
+| Budget sync ID | `ACTUAL_BUDGET_ID` | Actual → Settings → Show advanced settings → Sync ID |
+| Encryption password | `ACTUAL_E2E_PASSWORD` | Only if end-to-end encryption is on |
+
+Precedence: real environment variables → `.env` in the current directory → `~/.actual-importer/config.json`.
+
+Account mappings (which bank account is which Actual account) always live in the
+JSON config file — set `ACTUAL_IMPORTER_CONFIG` to use a different path. Secrets
+from `.env` are never copied into it.
 
 ### 2. Import transactions
 
@@ -60,6 +79,13 @@ actual-importer import --file ~/Downloads/Lista_transakcji_ING.csv --bank ing
 ```bash
 actual-importer import --file ~/Downloads/historia_santander.csv --bank santander
 ```
+
+The first time you import a CSV from a new bank account, you're asked which Actual
+account it belongs to. You're also shown bank accounts you've sent money to or
+received money from at least twice: mark the ones that are yours (a spouse's
+account, a joint account, savings) and money moving between them is recorded as
+a transfer. The rest are remembered so you're not asked again. In a
+non-interactive shell, an unmapped source account is an error.
 
 #### Dry-run mode
 
@@ -81,7 +107,11 @@ actual-importer accounts
 
 ### Transfer detection
 
-When a transaction's counterparty account matches one of your configured bank accounts, it's automatically recorded as an Actual Budget transfer instead of a standalone expense/income.
+When a transaction's counterparty account matches one of your mapped bank accounts, it's recorded as an Actual Budget transfer instead of a standalone expense/income.
+
+If both sides get imported (e.g. you import both the ING and the Santander CSV), the transfer is still recorded once: when the other side already exists in Actual (opposite amount, within ±3 days), the two are linked instead of creating a duplicate.
+
+Only map accounts that exist in your Actual budget. Money sent to someone whose account you don't track (e.g. a partner's personal account outside the budget) should stay a regular expense/income.
 
 ### Deduplication
 

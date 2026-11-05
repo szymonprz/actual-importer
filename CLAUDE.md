@@ -12,14 +12,14 @@ actual-importer is a CLI tool (Node.js + TypeScript) that imports bank transacti
 - **CLI framework:** yargs (command routing and --help)
 - **Interactive prompts:** @clack/prompts (setup wizard)
 - **Actual Budget SDK:** @actual-app/api
-- **Config:** `~/.actual-importer/config.json` (plain JSON, local-only)
+- **Config:** connection from env vars / `.env` (see `.env.example`), falling back to `~/.actual-importer/config.json`; account mappings always in the JSON file (`ACTUAL_IMPORTER_CONFIG` overrides its path)
 
 ## Architecture
 
 ### CLI Commands
 
-- `setup` — interactive wizard to configure server URL, API password, budget ID, and account mappings
-- `import --file <path> --bank <id> [--dry-run]` — parse CSV, detect transfers, deduplicate, and import
+- `setup` — interactive wizard for the connection (server URL, password, budget picked from a list, E2E password); saves to the JSON config or `./.env`
+- `import --file <path> --bank <id> [--dry-run]` — parse CSV, detect transfers, deduplicate, and import. Prompts (TTY only) to map an unmapped source account and frequent unmapped counterparty accounts
 - `accounts` — list Actual Budget accounts from the configured budget
 
 ### Bank Parser Interface
@@ -37,7 +37,7 @@ Adding a new parser also requires registering it in `src/parsers/registry.ts` (2
 
 ### Key Domain Logic
 
-- **Transfer detection:** if a transaction's `counterpartyAccount` matches a configured `bankAccountNumber`, it becomes an Actual Budget transfer between mapped accounts
+- **Transfer detection:** if a transaction's `counterpartyAccount` matches a configured `bankAccountNumber`, it becomes an Actual Budget transfer. Transfers are created by setting `payee` to the target account's transfer payee — never write `transfer_id` directly (it's a transaction id, not an account id). If the other side already exists unlinked in the target account, the importer links the two (`src/services/transfer-matcher.ts`)
 - **Deduplication:** `imported_id = SHA256(date + "|" + amount + "|" + description + "|" + bankAccountNumber)`
 - **Dry-run:** executes all logic except API writes; summary prefixed with `[DRY RUN]`
 
