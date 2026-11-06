@@ -68,6 +68,11 @@ Account mappings (which bank account is which Actual account) always live in the
 JSON config file — set `ACTUAL_IMPORTER_CONFIG` to use a different path. Secrets
 from `.env` are never copied into it.
 
+The budget is downloaded to `~/.actual-importer/cache` (readable only by you,
+since it is a full decrypted copy) on each run; set `ACTUAL_IMPORTER_DATA_DIR`
+to put it elsewhere. Versions before this one cached it in
+`/tmp/actual-importer-data`, which you can delete.
+
 ### 2. Import transactions
 
 Export a CSV from your bank's online portal, then:
