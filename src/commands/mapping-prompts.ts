@@ -5,7 +5,7 @@ import {
   type Config,
 } from "../config/config.js";
 import type { LedgerAccount } from "../ledger/ledger.js";
-import type { CounterpartyCandidate } from "../services/account-mapping.js";
+import type { CounterpartyCandidate } from "../import/account-mapping.js";
 import {
   formatAccountNumber,
   normalizeAccountNumber,

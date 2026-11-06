@@ -39,3 +39,23 @@ export function pickCounterpart(
       (x, y) => daysBetween(x.date, tx.date) - daysBetween(y.date, tx.date)
     )[0];
 }
+
+/**
+ * The statement's own side of a transfer may already exist in the source
+ * account: Actual creates it automatically when the other bank's statement is
+ * imported first. Such a transaction has no imported_id and is linked to a
+ * transaction (not an account id) through `transfer_id`.
+ */
+export function pickAutoCreated(
+  candidates: ExistingTransaction[],
+  claimed: ReadonlySet<string>,
+  accountIds: ReadonlySet<string>
+): ExistingTransaction | undefined {
+  return candidates.find(
+    (t) =>
+      t.imported_id === null &&
+      t.transfer_id !== null &&
+      !accountIds.has(t.transfer_id) &&
+      !claimed.has(t.id)
+  );
+}
