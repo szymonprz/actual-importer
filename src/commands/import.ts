@@ -12,7 +12,8 @@ import { planImport } from "../import/plan.js";
 import { formatReport, formatTransfers, planToJson } from "../import/report.js";
 import { withBudget } from "../ledger/actual.js";
 import type { Ledger, LedgerAccount } from "../ledger/ledger.js";
-import { getAvailableBankIds, getParser } from "../parsers/registry.js";
+import { detectParsers, getAvailableBankIds, getParser } from "../parsers/registry.js";
+import type { BankParser } from "../parsers/types.js";
 import {
   promptCounterpartyMappings,
   promptSourceMapping,
@@ -30,7 +31,8 @@ import {
 
 export interface ImportArgs extends GlobalArgs {
   file: string;
-  bank: string;
+  /** Detected from the file when omitted. */
+  bank?: string;
   dryRun: boolean;
   from?: string;
   to?: string;
@@ -54,8 +56,7 @@ export const importCommand = defineCommand({
       .option("bank", {
         alias: "b",
         type: "string",
-        describe: `Bank identifier (${getAvailableBankIds().join(", ")})`,
-        demandOption: true,
+        describe: `Bank identifier (${getAvailableBankIds().join(", ")}); detected from the file when omitted`,
       })
       .option("from", {
         type: "string",
@@ -93,8 +94,7 @@ export async function runImport(
   args: ImportArgs,
   ctx: CommandContext
 ): Promise<ImportOutcome> {
-  const parser = getParser(args.bank);
-  if (!parser) {
+  if (args.bank !== undefined && !getParser(args.bank)) {
     throw new UserError(
       `Unknown bank: '${args.bank}'. Available banks: ${getAvailableBankIds().join(", ")}`
     );
@@ -102,11 +102,21 @@ export async function runImport(
 
   const config = await loadConfig();
 
+  let content: Buffer;
+  try {
+    content = await readFile(args.file);
+  } catch (error) {
+    throw new UserError(`Failed to read '${args.file}': ${errorMessage(error)}`);
+  }
+
+  const parser = args.bank ? getParser(args.bank)! : detectBank(content, ctx);
+  const bank = parser.bankId;
+
   let statement: Statement;
   try {
-    statement = parser.parse(await readFile(args.file));
+    statement = parser.parse(content);
   } catch (error) {
-    throw new UserError(`Failed to read '${args.file}' as ${args.bank} CSV: ${errorMessage(error)}`);
+    throw new UserError(`Failed to read '${args.file}' as ${bank} CSV: ${errorMessage(error)}`);
   }
 
   const total = statement.transactions.length;
@@ -120,7 +130,7 @@ export async function runImport(
     result(ctx, formatReport([], outcome, args.dryRun), {
       dryRun: args.dryRun,
       file: args.file,
-      bank: args.bank,
+      bank,
       outcome,
       transactions: [],
     });
@@ -130,7 +140,7 @@ export async function runImport(
   // Connect in dry-run too: it's read-only and lets us report exactly what
   // would be skipped, and which transfers would be linked vs. created.
   return withBudget(config, (ledger) =>
-    importStatement(ledger, config, statement, args, ctx)
+    importStatement(ledger, config, statement, { ...args, bank }, ctx)
   );
 }
 
@@ -138,7 +148,7 @@ async function importStatement(
   ledger: Ledger,
   config: Config,
   statement: Statement,
-  args: ImportArgs,
+  args: ImportArgs & { bank: string },
   ctx: CommandContext
 ): Promise<ImportOutcome> {
   const accounts = await ledger.getAccounts();
@@ -208,4 +218,18 @@ async function resolveSourceMapping(
   const existing = findMapping(statement.sourceAccountNumber, config.accountMappings);
   if (existing || !ctx.interactive) return existing;
   return promptSourceMapping(config, statement.sourceAccountNumber, bank, accounts);
+}
+
+function detectBank(content: Buffer, ctx: CommandContext): BankParser {
+  const matches = detectParsers(content);
+  if (matches.length !== 1) {
+    throw new UserError(
+      (matches.length === 0
+        ? "Couldn't tell which bank this file is from."
+        : `This file looks like more than one bank's format (${matches.map((p) => p.bankId).join(", ")}).`) +
+        ` Pass --bank (${getAvailableBankIds().join(", ")}).`
+    );
+  }
+  info(ctx, `Detected bank: ${matches[0].displayName}`);
+  return matches[0];
 }

@@ -80,6 +80,8 @@ actual-importer import --file ~/Downloads/Lista_transakcji_ING.csv --bank ing
 actual-importer import --file ~/Downloads/historia_erste.csv --bank erste
 ```
 
+`--bank` can be left out: the bank is recognised from the file's layout.
+
 The first time you import a CSV from a new bank account, you're asked which Actual
 account it belongs to. You're also shown bank accounts you've sent money to or
 received money from at least twice: mark the ones that are yours (a spouse's
