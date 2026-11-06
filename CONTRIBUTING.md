@@ -5,7 +5,8 @@ npm install
 npm run check   # lint + typecheck (including tests) + tests — run before every commit
 ```
 
-Tests sit next to the code they cover (`foo.ts` → `foo.test.ts`).
+Tests sit next to the code they cover (`foo.ts` → `foo.test.ts`). See
+[ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit together.
 
 ## Adding a bank
 

@@ -171,7 +171,9 @@ npm test          # Run tests
 npm run dev       # Run CLI via tsx (no build needed)
 ```
 
-Set `DEBUG=1` to get stack traces for unexpected errors.
+Set `DEBUG=1` to get stack traces for unexpected errors. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the design, [CONTRIBUTING.md](CONTRIBUTING.md)
+for adding a bank, and [AGENTS.md](AGENTS.md) if you work with an AI coding agent.
 
 Run a command during development:
 

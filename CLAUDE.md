@@ -1,58 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+@AGENTS.md
 
-## Project Overview
+## Local notes
 
-actual-importer is a CLI tool (Node.js + TypeScript) that imports bank transaction history from Polish banks (ING, Erste — formerly Santander) into a self-hosted Actual Budget instance. It handles CSV parsing, inter-account transfer detection, deduplication via SHA-256 hashed `imported_id`, and persists results via the `@actual-app/api` SDK.
-
-## Tech Stack
-
-- **Runtime:** Node.js with TypeScript
-- **CLI framework:** yargs (command routing and --help)
-- **Interactive prompts:** @clack/prompts (setup wizard)
-- **Actual Budget SDK:** @actual-app/api
-- **Config:** connection from env vars / `.env` (see `.env.example`), falling back to `~/.actual-importer/config.json`; account mappings always in the JSON file (`ACTUAL_IMPORTER_CONFIG` overrides its path)
-
-## Architecture
-
-### CLI Commands
-
-- `setup` — interactive wizard for the connection (server URL, password, budget picked from a list, E2E password); saves to the JSON config or `./.env`
-- `import --file <path> [--bank <id>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--dry-run] [--json]` — parse CSV, detect transfers, deduplicate, and import. Prompts (interactive only) to map an unmapped source account and frequent unmapped counterparty accounts
-- `accounts [--json]` — list Actual Budget accounts and their mapped bank accounts
-- `map <bank-account> [<actual account id|name>] [--bank id] [--ignore] [--remove]` — non-interactive mapping
-- Global: `--no-input` disables prompts; `--json` implies it. Prompts also need a TTY.
-
-Each command is a `defineCommand({...})` module in `src/commands/`, registered in `src/cli.ts`. Commands throw `UserError` (`src/errors.ts`) for expected failures; `cli.ts` prints the message and sets the exit code — don't call `process.exit` in commands.
-
-### Bank Parser Interface
-
-Parsers live in `src/parsers/<bankId>/index.ts`, implement `BankParser` (`src/parsers/types.ts`: `bankId`, `displayName`, `aliases?`, `detect(buffer)`, `parse(content) → { sourceAccountNumber, transactions }`) and are listed in `src/parsers/registry.ts`. `--bank` is optional: the parser whose `detect()` matches is used. Each parser needs `fixtures/sample.csv`; `src/parsers/contract.test.ts` checks every registered parser against it. Step-by-step guide: `CONTRIBUTING.md`.
-
-### Key Domain Logic
-
-- **Transfer detection:** if a transaction's `counterpartyAccount` matches a configured `bankAccountNumber`, it becomes an Actual Budget transfer. Transfers are created by setting `payee` to the target account's transfer payee — never write `transfer_id` directly (it's a transaction id, not an account id). If the other side already exists unlinked in the target account, the importer links the two (`src/import/transfer-matcher.ts`)
-- **Deduplication:** `imported_id = SHA256(date + "|" + amount + "|" + description + "|" + bankAccountNumber)`; the 2nd, 3rd… identical transaction in a statement appends `"|" + occurrence` (`computeImportedIds`), so same-day duplicates like two ATM withdrawals stay distinct while first-occurrence IDs never change
-- **Dry-run:** executes all logic except API writes; summary prefixed with `[DRY RUN]`
-
-### Actual Budget API
-
-- Amounts are in **integer cents** (e.g. $12.30 = 1230). Use `toCents()` from `src/domain/money.ts`.
-- `importTransactions()` returns `{ added, updated, errors }` — deduplication is handled by Actual via `imported_id`.
-- ING CSVs are CP1250-encoded and use semicolons as delimiters. Erste (formerly Santander) CSVs are UTF-8 with comma delimiters.
-
-## Build & Development Commands
-
-```bash
-npm install          # install dependencies
-npm run build        # compile TypeScript (tsc)
-npm test             # run tests (vitest)
-npm run check        # lint + typecheck (incl. tests) + test — run before committing
-npm run lint         # lint code (eslint)
-npx tsx src/cli.ts   # run CLI without building
-```
-
-## PRD
-
-The full product requirements document is at `.ai/prd.md`.
+- The product requirements document is at `.ai/prd.md` (gitignored; local only).
