@@ -163,7 +163,7 @@ export async function setupCommand(): Promise<void> {
   }
 
   p.outro(
-    "Saved. Next: `actual-importer import --file <csv> --bank <ing|santander>`.\n" +
+    "Saved. Next: `actual-importer import --file <csv> --bank <ing|erste>`.\n" +
       "  New bank accounts are mapped the first time you import them."
   );
 }

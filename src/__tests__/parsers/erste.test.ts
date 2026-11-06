@@ -2,16 +2,18 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SantanderParser } from "../../parsers/santander/index.js";
+import { ErsteParser } from "../../parsers/erste/index.js";
+import { getParser } from "../../parsers/registry.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturePath = join(__dirname, "../fixtures/santander-sample.csv");
+const fixturePath = join(__dirname, "../fixtures/erste-sample.csv");
 
-describe("SantanderParser", () => {
-  const parser = new SantanderParser();
+describe("ErsteParser", () => {
+  const parser = new ErsteParser();
 
-  it("should have bankId 'santander'", () => {
-    expect(parser.bankId).toBe("santander");
+  it("should have bankId 'erste' and accept the old 'santander' id", () => {
+    expect(parser.bankId).toBe("erste");
+    expect(getParser("santander")?.bankId).toBe("erste");
   });
 
   it("should extract source account number from header row", () => {

@@ -5,7 +5,7 @@ CLI tool to import bank transaction history from Polish banks into [Actual Budge
 ## Supported Banks
 
 - **ING Bank Śląski** — CSV exports (CP1250 encoding)
-- **Santander Bank Polska** — CSV exports (UTF-8)
+- **Erste Bank Polska** (formerly Santander Bank Polska) — CSV exports (UTF-8). `--bank santander` still works.
 
 ## Features
 
@@ -77,7 +77,7 @@ actual-importer import --file ~/Downloads/Lista_transakcji_ING.csv --bank ing
 ```
 
 ```bash
-actual-importer import --file ~/Downloads/historia_santander.csv --bank santander
+actual-importer import --file ~/Downloads/historia_erste.csv --bank erste
 ```
 
 The first time you import a CSV from a new bank account, you're asked which Actual
@@ -119,13 +119,13 @@ actual-importer accounts
 
 When a transaction's counterparty account matches one of your mapped bank accounts, it's recorded as an Actual Budget transfer instead of a standalone expense/income.
 
-If both sides get imported (e.g. you import both the ING and the Santander CSV), the transfer is still recorded once: when the other side already exists in Actual (opposite amount, within ±3 days), the two are linked instead of creating a duplicate.
+If both sides get imported (e.g. you import both the ING and the Erste CSV), the transfer is still recorded once: when the other side already exists in Actual (opposite amount, within ±3 days), the two are linked instead of creating a duplicate.
 
 Only map accounts that exist in your Actual budget. Money sent to someone whose account you don't track (e.g. a partner's personal account outside the budget) should stay a regular expense/income.
 
 ### Deduplication
 
-Each transaction gets a unique `imported_id` computed as `SHA256(date|amount|description|bankAccountNumber)`. Actual Budget skips transactions with previously seen IDs, so re-importing the same CSV is safe.
+Each transaction gets a unique `imported_id` computed as `SHA256(date|amount|description|bankAccountNumber)`. Identical transactions on the same day (e.g. two ATM withdrawals of the same amount) get an occurrence number appended, so they aren't merged. Actual Budget skips transactions with previously seen IDs, so re-importing the same CSV is safe.
 
 ## Development
 

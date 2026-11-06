@@ -30,7 +30,7 @@ yargs(hideBin(process.argv))
         .option("bank", {
           alias: "b",
           type: "string",
-          describe: "Bank identifier (e.g. ing, santander)",
+          describe: "Bank identifier (e.g. ing, erste)",
           demandOption: true,
         })
         .option("from", {
