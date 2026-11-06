@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { detectTransfer } from "../../services/transfer-detector.js";
-import type { Transaction } from "../../parsers/types.js";
-import type { AccountMapping } from "../../config/config.js";
+import { detectTransfer } from "./transfer-detector.js";
+import type { Transaction } from "../parsers/types.js";
+import type { AccountMapping } from "../config/config.js";
 
 const mappings: AccountMapping[] = [
   {

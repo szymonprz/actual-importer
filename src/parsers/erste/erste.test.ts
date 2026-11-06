@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ErsteParser } from "../../parsers/erste/index.js";
-import { getParser } from "../../parsers/registry.js";
+import { ErsteParser } from "./index.js";
+import { getParser } from "../registry.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturePath = join(__dirname, "../fixtures/erste-sample.csv");
+const fixturePath = join(__dirname, "fixtures/sample.csv");
 
 describe("ErsteParser", () => {
   const parser = new ErsteParser();

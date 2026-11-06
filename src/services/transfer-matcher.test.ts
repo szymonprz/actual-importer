@@ -3,8 +3,8 @@ import {
   pickCounterpart,
   isUnlinked,
   shiftDate,
-} from "../../services/transfer-matcher.js";
-import type { ExistingTransaction } from "../../services/actual.js";
+} from "./transfer-matcher.js";
+import type { ExistingTransaction } from "./actual.js";
 
 const ACCOUNTS = new Set(["acct-ing", "acct-santander"]);
 

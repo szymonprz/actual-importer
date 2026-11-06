@@ -3,8 +3,8 @@ import {
   findMapping,
   findUnmappedCounterparties,
   formatAccountNumber,
-} from "../../services/account-mapping.js";
-import type { Transaction } from "../../parsers/types.js";
+} from "./account-mapping.js";
+import type { Transaction } from "../parsers/types.js";
 
 const OWN = "10105014611000009704886994";
 const WIFE = "20105014611000009704889326";

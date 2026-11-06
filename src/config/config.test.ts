@@ -9,7 +9,7 @@ import {
   saveMappings,
   normalizeAccountNumber,
   ENV,
-} from "../../config/config.js";
+} from "./config.js";
 
 describe("resolveConnection", () => {
   const file = { serverUrl: "https://file", password: "filepw", budgetId: "file-id" };

@@ -1,5 +1,5 @@
 // Helper script to create a CP1250-encoded ING fixture
-// Run with: npx tsx src/__tests__/fixtures/create-ing-fixture.ts
+// Run with: npx tsx src/parsers/ing/fixtures/create-fixture.ts
 import * as iconv from "iconv-lite";
 import { writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -37,5 +37,5 @@ const content = `"Lista transakcji";;;;;"ING Bank Śląski S.A.";;;;;;;;;;;;;;;
 `;
 
 const encoded = iconv.encode(content, "cp1250");
-writeFileSync(join(__dirname, "ing-sample.csv"), encoded);
+writeFileSync(join(__dirname, "sample.csv"), encoded);
 console.log("Created ing-sample.csv");

@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as iconv from "iconv-lite";
-import { IngParser } from "../../parsers/ing/index.js";
+import { IngParser } from "./index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturePath = join(__dirname, "../fixtures/ing-sample.csv");
+const fixturePath = join(__dirname, "fixtures/sample.csv");
 
 describe("IngParser", () => {
   const parser = new IngParser();
