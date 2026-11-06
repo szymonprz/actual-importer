@@ -48,3 +48,23 @@ export function formatSummary(outcome: ImportOutcome, dryRun: boolean): string {
   }
   return lines.join("\n");
 }
+
+/** Machine-readable view of a plan's transactions (for --json). */
+export function planToJson(
+  plan: ImportPlan,
+  accountNames: ReadonlyMap<string, string>
+) {
+  return plan.items.map(({ source, amount, importedId, action }) => ({
+    date: source.date,
+    amountCents: amount,
+    payee: source.payee,
+    description: source.description,
+    importedId,
+    action: action.kind,
+    ...("target" in action
+      ? { transferAccount: { id: action.target, name: accountNames.get(action.target) } }
+      : {}),
+    ...(action.kind === "link" ? { linkedTransactionId: action.counterpart.id } : {}),
+    ...(action.kind === "adopt" ? { adoptedTransactionId: action.existing.id } : {}),
+  }));
+}

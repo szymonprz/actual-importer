@@ -12,16 +12,23 @@ import {
   type ConnectionConfig,
 } from "../config/config.js";
 import { listBudgets, withBudget, type RemoteBudget } from "../ledger/actual.js";
+import { defineCommand, errorMessage, UserError } from "./runtime.js";
+
+export const setupCommand = defineCommand({
+  command: "setup",
+  describe: "Interactive wizard: connect to your Actual Budget server and pick a budget",
+  handler: () => runSetup(),
+});
 
 function exitIfCancel<T>(value: T): Exclude<T, symbol> {
   if (p.isCancel(value)) {
     p.cancel("Setup cancelled.");
-    process.exit(0);
+    throw new UserError("Setup cancelled.", 0);
   }
   return value as Exclude<T, symbol>;
 }
 
-export async function setupCommand(): Promise<void> {
+async function runSetup(): Promise<void> {
   p.intro("actual-importer setup");
 
   if (connectionFromEnv()) {
@@ -74,13 +81,11 @@ export async function setupCommand(): Promise<void> {
     spinner.stop("Logged in");
   } catch (error) {
     spinner.stop("Login failed");
-    p.log.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    throw new UserError(`Could not log in to ${serverUrl}: ${errorMessage(error)}`);
   }
 
   if (budgets.length === 0) {
-    p.log.error("No budgets found on this server.");
-    process.exit(1);
+    throw new UserError("No budgets found on this server.");
   }
 
   let budget = budgets[0];
@@ -124,7 +129,7 @@ export async function setupCommand(): Promise<void> {
     e2ePassword,
   };
 
-  if (!(await testConnection(conn))) process.exit(1);
+  if (!(await testConnection(conn))) throw new UserError("Could not open the budget.");
 
   const dotEnvPath = join(process.cwd(), ".env");
   const target = exitIfCancel(
@@ -169,7 +174,7 @@ async function testConnection(conn: ConnectionConfig): Promise<boolean> {
     return true;
   } catch (error) {
     spinner.stop("Could not open budget");
-    p.log.error(error instanceof Error ? error.message : String(error));
+    p.log.error(errorMessage(error));
     return false;
   }
 }

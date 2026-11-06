@@ -7,6 +7,8 @@ import {
   missingConnectionFields,
   upsertDotEnv,
   saveMappings,
+  withMapping,
+  withoutMapping,
   ENV,
 } from "./config.js";
 
@@ -95,5 +97,21 @@ describe("saveMappings", () => {
       accountMappings: fromEnv.accountMappings,
       ignoredCounterparties: ["2"],
     });
+  });
+});
+
+describe("withMapping / withoutMapping", () => {
+  const a = { bankAccountNumber: "10105014611000009704886994", actualAccountId: "x" };
+
+  it("replaces an existing mapping for the same account, stored normalized", () => {
+    const next = withMapping([a], {
+      bankAccountNumber: "PL10 1050 1461 1000 0097 0488 6994",
+      actualAccountId: "y",
+    });
+    expect(next).toEqual([{ bankAccountNumber: a.bankAccountNumber, actualAccountId: "y" }]);
+  });
+
+  it("removes regardless of formatting", () => {
+    expect(withoutMapping([a], "10 1050 1461 1000 0097 0488 6994")).toEqual([]);
   });
 });

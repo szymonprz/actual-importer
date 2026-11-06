@@ -4,7 +4,7 @@ import type { Transaction } from "../domain/transaction.js";
 import { InMemoryLedger, transferPayeeId } from "../test-support/in-memory-ledger.js";
 import { executePlan, predictOutcome } from "./execute.js";
 import { planImport } from "./plan.js";
-import { formatTransfers } from "./report.js";
+import { formatTransfers, planToJson } from "./report.js";
 
 const ING_NRB = "11000022223333444455556666";
 const ERSTE_NRB = "99000011112222333344445555";
@@ -175,4 +175,19 @@ describe("import pipeline", () => {
       "  2026-11-02     -300.00  → Erste  link to existing (2026-11-03)",
     ]);
   });
+
+  it("describes every transaction as JSON", async () => {
+    const counterpart = ledger.seed({ account: erste, date: "2026-11-03", amount: 30000 });
+    const { plan } = await run(ing, [tx(), toErste({ amount: -300 })], true);
+
+    const json = planToJson(plan, new Map([[erste, "Erste"]]));
+    expect(json[0]).toMatchObject({ date: "2026-11-02", amountCents: -4550, payee: "Shop", action: "create" });
+    expect(json[0]).not.toHaveProperty("transferAccount");
+    expect(json[1]).toMatchObject({
+      action: "link",
+      transferAccount: { id: erste, name: "Erste" },
+      linkedTransactionId: counterpart.id,
+    });
+  });
 });
+
