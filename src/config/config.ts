@@ -2,6 +2,8 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { sameAccount, normalizeAccountNumber } from "../domain/account-number.js";
+import { UserError } from "../errors.js";
 
 export interface AccountMapping {
   bankAccountNumber: string;
@@ -99,7 +101,7 @@ export async function loadConfig(): Promise<Config> {
   const conn = resolveConnection(file);
   const missing = missingConnectionFields(conn);
   if (missing.length > 0) {
-    throw new Error(
+    throw new UserError(
       `Missing connection settings: ${missing.join(", ")}.\n` +
         "Set them in .env (see .env.example) or run `actual-importer setup`."
     );
@@ -169,3 +171,30 @@ export function upsertDotEnv(existing: string, conn: ConnectionConfig): string {
   }
   return lines.join("\n") + "\n";
 }
+
+/**
+ * Mappings with `mapping` added, replacing any existing mapping for the same
+ * bank account. The account number is stored normalized.
+ */
+export function withMapping(
+  mappings: AccountMapping[],
+  mapping: AccountMapping
+): AccountMapping[] {
+  const normalized = {
+    ...mapping,
+    bankAccountNumber: normalizeAccountNumber(mapping.bankAccountNumber),
+  };
+  return [
+    ...mappings.filter((m) => !sameAccount(m.bankAccountNumber, mapping.bankAccountNumber)),
+    normalized,
+  ];
+}
+
+/** Mappings without the one for `bankAccountNumber`. */
+export function withoutMapping(
+  mappings: AccountMapping[],
+  bankAccountNumber: string
+): AccountMapping[] {
+  return mappings.filter((m) => !sameAccount(m.bankAccountNumber, bankAccountNumber));
+}
+

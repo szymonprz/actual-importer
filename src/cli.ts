@@ -2,73 +2,47 @@
 
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { setupCommand } from "./commands/setup.js";
-import { importCommand } from "./commands/import.js";
 import { accountsCommand } from "./commands/accounts.js";
+import { importCommand } from "./commands/import.js";
+import { mapCommand } from "./commands/map.js";
+import { setupCommand } from "./commands/setup.js";
+import { errorMessage, UserError } from "./commands/runtime.js";
 
-yargs(hideBin(process.argv))
-  .scriptName("actual-importer")
-  .command(
-    "setup",
-    "Configure Actual Budget connection and account mappings",
-    {},
-    async () => {
-      await setupCommand();
-    }
-  )
-  .command(
-    "import",
-    "Import transactions from a bank CSV file",
-    (yargs) =>
-      yargs
-        .option("file", {
-          alias: "f",
-          type: "string",
-          describe: "Path to the CSV file",
-          demandOption: true,
-        })
-        .option("bank", {
-          alias: "b",
-          type: "string",
-          describe: "Bank identifier (e.g. ing, erste)",
-          demandOption: true,
-        })
-        .option("from", {
-          type: "string",
-          describe: "Only import transactions on or after this date (YYYY-MM-DD)",
-        })
-        .option("to", {
-          type: "string",
-          describe: "Only import transactions on or before this date (YYYY-MM-DD)",
-        })
-        .check((argv) => {
-          for (const key of ["from", "to"] as const) {
-            const v = argv[key];
-            if (v !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-              throw new Error(`--${key} must be a date in YYYY-MM-DD format`);
-            }
-          }
-          return true;
-        })
-        .option("dry-run", {
-          type: "boolean",
-          describe: "Preview import without writing to Actual Budget",
-          default: false,
-        }),
-    async (argv) => {
-      await importCommand({
-        file: argv.file,
-        bank: argv.bank,
-        dryRun: argv.dryRun,
-        from: argv.from,
-        to: argv.to,
-      });
-    }
-  )
-  .command("accounts", "List Actual Budget accounts", {}, async () => {
-    await accountsCommand();
-  })
-  .demandCommand(1, "Please specify a command")
-  .strict()
-  .help()
-  .parse();
+try {
+  await yargs(hideBin(process.argv))
+    .scriptName("actual-importer")
+    .option("input", {
+      type: "boolean",
+      default: true,
+      describe: "Allow interactive prompts (--no-input to disable)",
+    })
+    // Each command lives in src/commands/<name>.ts (see defineCommand).
+    .command(setupCommand)
+    .command(importCommand)
+    .command(accountsCommand)
+    .command(mapCommand)
+    .demandCommand(1, "Please specify a command")
+    .strict()
+    .help()
+    .fail((message, error, y) => {
+      // Errors thrown by handlers are reported below. Anything else is an
+      // argument problem (including messages returned from .check()).
+      if (error instanceof Error) throw error;
+      y.showHelp();
+      console.error(`\n${message}`);
+      process.exit(1);
+    })
+    .parseAsync();
+} catch (error) {
+  if (error instanceof UserError) {
+    if (error.message) console.error(error.message);
+    process.exitCode = error.exitCode;
+  } else {
+    console.error(
+      process.env.DEBUG && error instanceof Error && error.stack
+        ? error.stack
+        : `Error: ${errorMessage(error)}`
+    );
+    process.exitCode = 1;
+  }
+}

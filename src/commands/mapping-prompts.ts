@@ -11,10 +11,6 @@ import {
   normalizeAccountNumber,
 } from "../domain/account-number.js";
 
-export function canPrompt(): boolean {
-  return Boolean(process.stdin.isTTY && process.stdout.isTTY);
-}
-
 async function pickAccount(
   message: string,
   accounts: LedgerAccount[]

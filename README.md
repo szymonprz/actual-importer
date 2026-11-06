@@ -85,7 +85,8 @@ account it belongs to. You're also shown bank accounts you've sent money to or
 received money from at least twice: mark the ones that are yours (a spouse's
 account, a joint account, savings) and money moving between them is recorded as
 a transfer. The rest are remembered so you're not asked again. In a
-non-interactive shell, an unmapped source account is an error.
+non-interactive shell (or with `--no-input` / `--json`), an unmapped source
+account is an error; map it with `actual-importer map` first.
 
 #### Date range
 
@@ -105,12 +106,38 @@ Preview what would be imported without writing to Actual Budget:
 actual-importer import --file transactions.csv --bank ing --dry-run
 ```
 
-### 3. List accounts
+#### Scripting and automation
 
-View available Actual Budget accounts:
+`--json` prints a single JSON document on stdout (progress messages go to stderr)
+and never prompts. It contains the outcome counts and one entry per transaction,
+with what happened to it (`create`, `duplicate`, `transfer`, `link`, `adopt`):
 
 ```bash
-actual-importer accounts
+actual-importer import --file transactions.csv --bank ing --dry-run --json | jq .outcome
+```
+
+The exit code is non-zero when anything failed. `--no-input` turns off prompts
+without changing the output.
+
+### 3. List accounts
+
+View your Actual Budget accounts and the bank accounts mapped to them:
+
+```bash
+actual-importer accounts          # add --json for machine-readable output
+```
+
+### 4. Map accounts without prompts
+
+```bash
+# This bank account is the Actual account "ING Main" (account name or id)
+actual-importer map "10 1050 1461 1000 0097 0488 6994" "ING Main" --bank ing
+
+# This counterparty is not one of mine; stop asking about it
+actual-importer map 20105014611000009704889326 --ignore
+
+# Forget a mapping or ignore entry
+actual-importer map 20105014611000009704889326 --remove
 ```
 
 ## How it works
@@ -131,10 +158,13 @@ Each transaction gets a unique `imported_id` computed as `SHA256(date|amount|des
 
 ```bash
 npm install
+npm run check     # Lint + typecheck + tests (run before committing)
 npm run build     # Compile TypeScript
 npm test          # Run tests
 npm run dev       # Run CLI via tsx (no build needed)
 ```
+
+Set `DEBUG=1` to get stack traces for unexpected errors.
 
 Run a command during development:
 
