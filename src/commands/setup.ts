@@ -8,9 +8,9 @@ import {
   loadConfig,
   readConfigFile,
   saveConnection,
-  upsertDotEnv,
   type ConnectionConfig,
 } from "../config/config.js";
+import { upsertDotEnv } from "../config/dotenv.js";
 import { listBudgets, withBudget, type RemoteBudget } from "../ledger/actual.js";
 import { defineCommand, errorMessage, UserError } from "./runtime.js";
 

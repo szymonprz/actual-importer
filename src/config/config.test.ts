@@ -5,12 +5,12 @@ import { join } from "node:path";
 import {
   resolveConnection,
   missingConnectionFields,
-  upsertDotEnv,
   saveMappings,
-  withMapping,
-  withoutMapping,
   ENV,
+  getDataDir,
 } from "./config.js";
+import { upsertDotEnv } from "./dotenv.js";
+import { withMapping, withoutMapping } from "./mappings.js";
 
 describe("resolveConnection", () => {
   const file = { serverUrl: "https://file", password: "filepw", budgetId: "file-id" };
@@ -113,5 +113,15 @@ describe("withMapping / withoutMapping", () => {
 
   it("removes regardless of formatting", () => {
     expect(withoutMapping([a], "10 1050 1461 1000 0097 0488 6994")).toEqual([]);
+  });
+});
+
+describe("getDataDir", () => {
+  it("defaults to a private directory in the user's home, not /tmp", () => {
+    expect(getDataDir({})).toMatch(/\.actual-importer[/\\]cache$/);
+  });
+
+  it("can be overridden", () => {
+    expect(getDataDir({ [ENV.dataDir]: "/srv/actual-cache" })).toBe("/srv/actual-cache");
   });
 });

@@ -1,6 +1,6 @@
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import * as api from "@actual-app/api";
-import type { ConnectionConfig } from "../config/config.js";
+import { getDataDir, type ConnectionConfig } from "../config/config.js";
 import type {
   ExistingTransaction,
   ImportResult,
@@ -10,8 +10,6 @@ import type {
   TransactionFilter,
 } from "./ledger.js";
 
-const DATA_DIR = "/tmp/actual-importer-data";
-
 export interface RemoteBudget {
   syncId: string;
   name: string;
@@ -19,8 +17,10 @@ export interface RemoteBudget {
 }
 
 async function initServer(serverUrl: string, password: string): Promise<void> {
-  mkdirSync(DATA_DIR, { recursive: true });
-  await api.init({ dataDir: DATA_DIR, serverURL: serverUrl, password });
+  const dataDir = getDataDir();
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  chmodSync(dataDir, 0o700); // also tighten a directory created by an older version
+  await api.init({ dataDir, serverURL: serverUrl, password });
 }
 
 /** Log in and list the budgets on the server. */

@@ -2,9 +2,8 @@ import {
   loadConfig,
   readConfigFile,
   saveMappings,
-  withMapping,
-  withoutMapping,
 } from "../config/config.js";
+import { withMapping, withoutMapping } from "../config/mappings.js";
 import { formatAccountNumber, normalizeAccountNumber, sameAccount } from "../domain/account-number.js";
 import { withBudget } from "../ledger/actual.js";
 import type { LedgerAccount } from "../ledger/ledger.js";

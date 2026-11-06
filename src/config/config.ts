@@ -2,14 +2,11 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { sameAccount, normalizeAccountNumber } from "../domain/account-number.js";
 import { UserError } from "../errors.js";
 
-export interface AccountMapping {
-  bankAccountNumber: string;
-  actualAccountId: string;
-  bank?: string;
-}
+import type { AccountMapping } from "./mappings.js";
+
+export type { AccountMapping };
 
 export interface ConnectionConfig {
   serverUrl: string;
@@ -33,9 +30,22 @@ export const ENV = {
   budgetId: "ACTUAL_BUDGET_ID",
   e2ePassword: "ACTUAL_E2E_PASSWORD",
   configPath: "ACTUAL_IMPORTER_CONFIG",
+  dataDir: "ACTUAL_IMPORTER_DATA_DIR",
 } as const;
 
-const DEFAULT_CONFIG_PATH = join(homedir(), ".actual-importer", "config.json");
+const HOME_DIR = join(homedir(), ".actual-importer");
+const DEFAULT_CONFIG_PATH = join(HOME_DIR, "config.json");
+
+/**
+ * Where @actual-app/api caches the downloaded budget. It holds a full,
+ * decrypted copy of the budget, so it lives in the user's home directory
+ * (created 0700), not a shared temp dir.
+ */
+export function getDataDir(env: NodeJS.ProcessEnv = process.env): string {
+  loadDotEnv();
+  const override = env[ENV.dataDir];
+  return override ? resolve(override) : join(HOME_DIR, "cache");
+}
 
 let envLoaded = false;
 
@@ -134,67 +144,3 @@ export async function saveMappings(
     ignoredCounterparties: update.ignoredCounterparties,
   });
 }
-
-/**
- * Insert or update connection keys in a .env file, keeping any other lines.
- * Values are quoted so passwords with spaces or `#` survive.
- */
-export function upsertDotEnv(existing: string, conn: ConnectionConfig): string {
-  const values: Record<string, string | undefined> = {
-    [ENV.serverUrl]: conn.serverUrl,
-    [ENV.password]: conn.password,
-    [ENV.budgetId]: conn.budgetId,
-    [ENV.e2ePassword]: conn.e2ePassword,
-  };
-  // Node's .env parser has no escape sequences, so pick a quote char the value
-  // doesn't contain. Single quotes are literal (no \n expansion).
-  const quote = (v: string) => {
-    const q = ["'", '"', "`"].find((c) => !v.includes(c));
-    if (!q || v.includes("\n")) {
-      throw new Error("Value can't be written to .env safely; use the JSON config instead.");
-    }
-    return `${q}${v}${q}`;
-  };
-  const seen = new Set<string>();
-  const lines = existing
-    .split("\n")
-    .filter((line, i, all) => !(i === all.length - 1 && line === ""))
-    .flatMap((line) => {
-      const key = line.match(/^\s*([A-Z0-9_]+)\s*=/)?.[1];
-      if (!key || !(key in values)) return [line];
-      seen.add(key);
-      const v = values[key];
-      return v ? [`${key}=${quote(v)}`] : [];
-    });
-  for (const [key, v] of Object.entries(values)) {
-    if (!seen.has(key) && v) lines.push(`${key}=${quote(v)}`);
-  }
-  return lines.join("\n") + "\n";
-}
-
-/**
- * Mappings with `mapping` added, replacing any existing mapping for the same
- * bank account. The account number is stored normalized.
- */
-export function withMapping(
-  mappings: AccountMapping[],
-  mapping: AccountMapping
-): AccountMapping[] {
-  const normalized = {
-    ...mapping,
-    bankAccountNumber: normalizeAccountNumber(mapping.bankAccountNumber),
-  };
-  return [
-    ...mappings.filter((m) => !sameAccount(m.bankAccountNumber, mapping.bankAccountNumber)),
-    normalized,
-  ];
-}
-
-/** Mappings without the one for `bankAccountNumber`. */
-export function withoutMapping(
-  mappings: AccountMapping[],
-  bankAccountNumber: string
-): AccountMapping[] {
-  return mappings.filter((m) => !sameAccount(m.bankAccountNumber, bankAccountNumber));
-}
-
