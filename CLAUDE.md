@@ -43,7 +43,7 @@ Adding a new parser also requires registering it in `src/parsers/registry.ts` (2
 
 ### Actual Budget API
 
-- Amounts are in **integer cents** (e.g. $12.30 = 1230). Use `amountToInteger()` from `src/services/actual.ts`.
+- Amounts are in **integer cents** (e.g. $12.30 = 1230). Use `toCents()` from `src/domain/money.ts`.
 - `importTransactions()` returns `{ added, updated, errors }` — deduplication is handled by Actual via `imported_id`.
 - ING CSVs are CP1250-encoded and use semicolons as delimiters. Erste (formerly Santander) CSVs are UTF-8 with comma delimiters.
 

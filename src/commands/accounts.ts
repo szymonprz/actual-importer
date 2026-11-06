@@ -1,6 +1,6 @@
 import { loadConfig, type Config } from "../config/config.js";
 import { connect, disconnect, getAccounts } from "../services/actual.js";
-import { formatAccountNumber } from "../services/account-mapping.js";
+import { formatAccountNumber } from "../domain/account-number.js";
 
 export async function accountsCommand(): Promise<void> {
   let config: Config;

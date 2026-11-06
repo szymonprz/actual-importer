@@ -1,15 +1,15 @@
 import * as p from "@clack/prompts";
 import {
-  normalizeAccountNumber,
   saveMappings,
   type AccountMapping,
   type Config,
 } from "../config/config.js";
 import type { ActualAccount } from "../services/actual.js";
+import type { CounterpartyCandidate } from "../services/account-mapping.js";
 import {
   formatAccountNumber,
-  type CounterpartyCandidate,
-} from "../services/account-mapping.js";
+  normalizeAccountNumber,
+} from "../domain/account-number.js";
 
 export function canPrompt(): boolean {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);

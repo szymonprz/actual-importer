@@ -1,24 +1,12 @@
-import { parse } from "csv-parse/sync";
+import { parseDecimalAmount } from "../../domain/money.js";
 import type { BankParser, ParseResult } from "../types.js";
+import { atRow, cleanAccountNumber, decode, readRows } from "../shared.js";
 
 function parseDate(raw: string): string {
-  // Erste uses DD-MM-YYYY format, convert to YYYY-MM-DD
-  const parts = raw.split("-");
-  if (parts.length !== 3) {
-    throw new Error(`Erste CSV: invalid date format '${raw}'`);
-  }
-  return `${parts[2]}-${parts[1]}-${parts[0]}`;
-}
-
-function parseAmount(raw: string): number {
-  // Erste uses comma as decimal separator, e.g. "-439,03"
-  return parseFloat(raw.replace(",", "."));
-}
-
-function cleanAccountNumber(raw: string | undefined): string | undefined {
-  if (!raw) return undefined;
-  const cleaned = raw.replace(/['\s]/g, "");
-  return cleaned.length > 0 ? cleaned : undefined;
+  // Erste uses DD-MM-YYYY; convert to YYYY-MM-DD
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(raw.trim());
+  if (!m) throw new Error(`invalid date format '${raw}'`);
+  return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
 /** Erste Bank Polska (formerly Santander Bank Polska) — same CSV format. */
@@ -26,47 +14,29 @@ export class ErsteParser implements BankParser {
   bankId = "erste";
 
   parse(csvContent: string | Buffer): ParseResult {
-    const content =
-      typeof csvContent === "string"
-        ? csvContent
-        : csvContent.toString("utf-8");
-
-    const records = parse(content, {
-      delimiter: ",",
-      quote: '"',
-      relax_column_count: true,
-      skip_empty_lines: true,
-    }) as string[][];
+    const records = readRows(decode(csvContent, "utf-8"), ",");
 
     if (records.length < 2) {
       return { sourceAccountNumber: "", transactions: [] };
     }
 
-    // First row is the header metadata row
-    // Columns: GenerationDate, FromDate, AccountNumber, Owner, Currency, OpenBalance, CloseBalance, Count
-    const headerRow = records[0];
-    const sourceAccountNumber = cleanAccountNumber(headerRow[2]) || "";
+    // First row is metadata:
+    // GenerationDate, FromDate, AccountNumber, Owner, Currency, OpenBalance, CloseBalance, Count
+    const sourceAccountNumber = cleanAccountNumber(records[0][2]) ?? "";
 
-    const dataRows = records.slice(1);
-
-    const transactions = dataRows
+    const transactions = records
+      .slice(1)
       .filter((row) => row.length >= 7)
-      .map((row) => {
-        // Columns: BookingDate, OperationDate, Title, Counterparty, CounterpartyAccount, Amount, Balance, RowNr
-        const date = parseDate(row[0]);
-        const description = (row[2] || "").trim();
-        const payee = (row[3] || "").trim();
-        const counterpartyAccount = cleanAccountNumber(row[4]);
-        const amount = parseAmount(row[5]);
-
-        return {
-          date,
-          amount,
-          payee,
-          description,
-          counterpartyAccount,
-        };
-      });
+      // Columns: BookingDate, OperationDate, Title, Counterparty, CounterpartyAccount, Amount, Balance, RowNr
+      .map((row, i) =>
+        atRow("Erste", i + 1, () => ({
+          date: parseDate(row[0]),
+          amount: parseDecimalAmount(row[5]),
+          payee: (row[3] || "").trim(),
+          description: (row[2] || "").trim(),
+          counterpartyAccount: cleanAccountNumber(row[4]),
+        }))
+      );
 
     return { sourceAccountNumber, transactions };
   }

@@ -177,7 +177,3 @@ export async function linkTransfer(
   await api.updateTransaction(a.id, { payee: payeeToB, transfer_id: b.id });
   await api.updateTransaction(b.id, { payee: payeeToA, transfer_id: a.id });
 }
-
-export function amountToInteger(amount: number): number {
-  return Math.round(amount * 100);
-}

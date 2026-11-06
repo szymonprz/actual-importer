@@ -71,4 +71,11 @@ describe("ErsteParser", () => {
     const result = parser.parse("");
     expect(result.transactions).toHaveLength(0);
   });
+
+  it("reports the row of a malformed amount instead of importing NaN", () => {
+    const csv =
+      '06-11-2026,01-11-2026,"\'11 0000 2222 3333 4444 5555 6666",X,PLN,0,0,1\n' +
+      '05-11-2026,05-11-2026,"Title","Shop","",abc,"0,00",1\n';
+    expect(() => parser.parse(csv)).toThrow(/Erste CSV, data row 1: invalid amount 'abc'/);
+  });
 });

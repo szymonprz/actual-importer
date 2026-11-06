@@ -1,16 +1,7 @@
 import type { ExistingTransaction } from "./actual.js";
+import { daysBetween } from "../domain/dates.js";
 
 export const TRANSFER_DATE_WINDOW_DAYS = 3;
-
-function daysBetween(a: string, b: string): number {
-  return Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
-}
-
-export function shiftDate(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * A transaction in the target account can be the other side of a transfer if

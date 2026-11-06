@@ -1,98 +1,67 @@
-import { parse } from "csv-parse/sync";
-import * as iconv from "iconv-lite";
+import { isIsoDate } from "../../domain/dates.js";
+import { parseDecimalAmount } from "../../domain/money.js";
 import type { BankParser, ParseResult } from "../types.js";
+import { atRow, cleanAccountNumber, decode, readRows } from "../shared.js";
 
 const DATA_ROW_START_MARKER = "Data transakcji";
 
-function cleanAccountNumber(raw: string | undefined): string | undefined {
-  if (!raw) return undefined;
-  // Remove leading apostrophe, surrounding quotes/spaces
-  const cleaned = raw.replace(/['\s]/g, "");
-  return cleaned.length > 0 ? cleaned : undefined;
-}
-
-function parseAmount(raw: string): number {
-  // ING uses comma as decimal separator, e.g. "-60,00"
-  return parseFloat(raw.replace(",", "."));
-}
-
 function findDataStartLine(lines: string[]): number {
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith(`"${DATA_ROW_START_MARKER}"`)) {
-      return i + 1; // data starts on the next line
-    }
-  }
-  throw new Error(
-    "ING CSV: could not find header row starting with 'Data transakcji'"
+  const i = lines.findIndex((line) =>
+    line.startsWith(`"${DATA_ROW_START_MARKER}"`)
   );
+  if (i === -1) {
+    throw new Error(
+      `ING CSV: could not find header row starting with '${DATA_ROW_START_MARKER}'`
+    );
+  }
+  return i + 1; // data starts on the next line
 }
 
 function extractSourceAccount(lines: string[]): string {
-  // ING CSV has the source account on the line after "Wybrane rachunki:"
-  // Format: "KONTO Direct (PLN)";;"10 1050 1461 1000 0097 0488 6994";
+  // The source account is on the line after "Wybrane rachunki:", 3rd field:
+  // "KONTO Direct (PLN)";;"10 1050 1461 1000 0097 0488 6994";
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes("Wybrane rachunki")) {
-      const accountLine = lines[i + 1];
-      if (accountLine) {
-        const parts = accountLine.split(";");
-        // Account number is in the 3rd field (index 2)
-        const raw = parts[2];
-        const cleaned = cleanAccountNumber(raw?.replace(/"/g, ""));
-        if (cleaned) return cleaned;
-      }
-    }
+    if (!lines[i].includes("Wybrane rachunki")) continue;
+    const cleaned = cleanAccountNumber(lines[i + 1]?.split(";")[2]);
+    if (cleaned) return cleaned;
   }
   throw new Error("ING CSV: could not find source account number");
 }
 
+/** ING Bank Śląski — CP1250, semicolon-delimited, metadata block before the data. */
 export class IngParser implements BankParser {
   bankId = "ing";
 
-  parse(csvBuffer: Buffer): ParseResult {
-    const content = iconv.decode(csvBuffer, "cp1250");
-    const lines = content.split("\n");
-
+  parse(csvContent: string | Buffer): ParseResult {
+    const lines = decode(csvContent, "cp1250").split("\n");
     const sourceAccountNumber = extractSourceAccount(lines);
 
-    const dataStart = findDataStartLine(lines);
     const dataLines = lines
-      .slice(dataStart)
+      .slice(findDataStartLine(lines))
       .filter((line) => line.trim().length > 0 && !line.startsWith('"Dokument'));
 
     if (dataLines.length === 0) {
       return { sourceAccountNumber, transactions: [] };
     }
 
-    const csvData = dataLines.join("\n");
-    const records = parse(csvData, {
-      delimiter: ";",
-      quote: '"',
-      relax_column_count: true,
-      skip_empty_lines: true,
-    }) as string[][];
-
-    const transactions = records
-      .filter((row) => {
-        if (row.length < 9 || !row[0].match(/^\d{4}-\d{2}-\d{2}$/)) return false;
-        // Skip pending transactions (empty booking date) — they'll appear as booked later
-        if (!row[1]?.trim()) return false;
-        return true;
-      })
-      .map((row) => {
-        const date = row[0]; // YYYY-MM-DD already
-        const payee = (row[2] || "").trim();
-        const description = (row[3] || "").trim();
-        const counterpartyAccount = cleanAccountNumber(row[4]);
-        const amount = parseAmount(row[8]);
-
-        return {
-          date,
-          amount,
-          payee,
-          description,
-          counterpartyAccount,
-        };
-      });
+    const transactions = readRows(dataLines.join("\n"), ";")
+      .filter(
+        (row) =>
+          row.length >= 9 &&
+          isIsoDate(row[0]) &&
+          // Pending transactions have no booking date; they'll appear as booked later.
+          Boolean(row[1]?.trim())
+      )
+      // Columns: transaction date, booking date, counterparty, title, counterparty account, …, amount (9th)
+      .map((row, i) =>
+        atRow("ING", i + 1, () => ({
+          date: row[0],
+          amount: parseDecimalAmount(row[8]),
+          payee: (row[2] || "").trim(),
+          description: (row[3] || "").trim(),
+          counterpartyAccount: cleanAccountNumber(row[4]),
+        }))
+      );
 
     return { sourceAccountNumber, transactions };
   }

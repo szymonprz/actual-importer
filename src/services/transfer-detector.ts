@@ -1,31 +1,21 @@
-import type { Transaction } from "../parsers/types.js";
+import type { Transaction } from "../domain/transaction.js";
 import type { AccountMapping } from "../config/config.js";
+import { findMapping } from "./account-mapping.js";
 
 export interface TransferResult {
   isTransfer: boolean;
   targetActualAccountId?: string;
 }
 
+/** A transaction is a transfer when its counterparty is one of the user's mapped accounts. */
 export function detectTransfer(
   transaction: Transaction,
   accountMappings: AccountMapping[]
 ): TransferResult {
-  if (!transaction.counterpartyAccount) {
-    return { isTransfer: false };
-  }
-
-  const normalizedCounterparty = transaction.counterpartyAccount.replace(
-    /\s/g,
-    ""
-  );
-
-  const match = accountMappings.find(
-    (m) => m.bankAccountNumber.replace(/\s/g, "") === normalizedCounterparty
-  );
-
-  if (match) {
-    return { isTransfer: true, targetActualAccountId: match.actualAccountId };
-  }
-
-  return { isTransfer: false };
+  const match = transaction.counterpartyAccount
+    ? findMapping(transaction.counterpartyAccount, accountMappings)
+    : undefined;
+  return match
+    ? { isTransfer: true, targetActualAccountId: match.actualAccountId }
+    : { isTransfer: false };
 }

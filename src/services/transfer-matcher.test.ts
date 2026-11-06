@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   pickCounterpart,
   isUnlinked,
-  shiftDate,
 } from "./transfer-matcher.js";
 import type { ExistingTransaction } from "./actual.js";
 
@@ -20,13 +19,6 @@ function tx(over: Partial<ExistingTransaction>): ExistingTransaction {
     ...over,
   };
 }
-
-describe("shiftDate", () => {
-  it("shifts across month boundaries", () => {
-    expect(shiftDate("2026-06-01", -3)).toBe("2026-05-29");
-    expect(shiftDate("2026-12-30", 3)).toBe("2027-01-02");
-  });
-});
 
 describe("isUnlinked", () => {
   it("treats null and account-id transfer_id as unlinked", () => {

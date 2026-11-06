@@ -7,7 +7,6 @@ import {
   missingConnectionFields,
   upsertDotEnv,
   saveMappings,
-  normalizeAccountNumber,
   ENV,
 } from "./config.js";
 
@@ -96,11 +95,5 @@ describe("saveMappings", () => {
       accountMappings: fromEnv.accountMappings,
       ignoredCounterparties: ["2"],
     });
-  });
-});
-
-describe("normalizeAccountNumber", () => {
-  it("strips spaces and PL prefix", () => {
-    expect(normalizeAccountNumber("PL10 1050 1461")).toBe("1010501461");
   });
 });

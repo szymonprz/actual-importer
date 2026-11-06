@@ -18,7 +18,6 @@ import {
   importTransactions,
   linkTransfer,
   updateTransaction,
-  amountToInteger,
 } from "../services/actual.js";
 import type {
   ActualTransaction,
@@ -26,9 +25,10 @@ import type {
 } from "../services/actual.js";
 import {
   pickCounterpart,
-  shiftDate,
   TRANSFER_DATE_WINDOW_DAYS,
 } from "../services/transfer-matcher.js";
+import { shiftDate } from "../domain/dates.js";
+import { toCents } from "../domain/money.js";
 import {
   createEmptySummary,
   formatSummary,
@@ -157,7 +157,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     const planned = parsed.transactions.map((tx, i) => ({
       tx,
       importedId: importedIds[i],
-      amount: amountToInteger(tx.amount),
+      amount: toCents(tx.amount),
       transfer: detectTransfer(tx, config.accountMappings),
     }));
 

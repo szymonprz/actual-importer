@@ -169,7 +169,3 @@ export function upsertDotEnv(existing: string, conn: ConnectionConfig): string {
   }
   return lines.join("\n") + "\n";
 }
-
-export function normalizeAccountNumber(raw: string): string {
-  return raw.replace(/\s/g, "").replace(/^PL/i, "");
-}
