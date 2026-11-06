@@ -53,6 +53,7 @@ Adding a new parser also requires registering it in `src/parsers/registry.ts` (2
 npm install          # install dependencies
 npm run build        # compile TypeScript (tsc)
 npm test             # run tests (vitest)
+npm run check        # lint + typecheck (incl. tests) + test — run before committing
 npm run lint         # lint code (eslint)
 npx tsx src/cli.ts   # run CLI without building
 ```
