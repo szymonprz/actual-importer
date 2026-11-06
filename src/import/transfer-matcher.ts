@@ -1,16 +1,7 @@
-import type { ExistingTransaction } from "./actual.js";
+import type { ExistingTransaction } from "../ledger/ledger.js";
+import { daysBetween } from "../domain/dates.js";
 
 export const TRANSFER_DATE_WINDOW_DAYS = 3;
-
-function daysBetween(a: string, b: string): number {
-  return Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
-}
-
-export function shiftDate(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * A transaction in the target account can be the other side of a transfer if
@@ -47,4 +38,24 @@ export function pickCounterpart(
     .sort(
       (x, y) => daysBetween(x.date, tx.date) - daysBetween(y.date, tx.date)
     )[0];
+}
+
+/**
+ * The statement's own side of a transfer may already exist in the source
+ * account: Actual creates it automatically when the other bank's statement is
+ * imported first. Such a transaction has no imported_id and is linked to a
+ * transaction (not an account id) through `transfer_id`.
+ */
+export function pickAutoCreated(
+  candidates: ExistingTransaction[],
+  claimed: ReadonlySet<string>,
+  accountIds: ReadonlySet<string>
+): ExistingTransaction | undefined {
+  return candidates.find(
+    (t) =>
+      t.imported_id === null &&
+      t.transfer_id !== null &&
+      !accountIds.has(t.transfer_id) &&
+      !claimed.has(t.id)
+  );
 }

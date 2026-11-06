@@ -1,15 +1,15 @@
 import * as p from "@clack/prompts";
 import {
-  normalizeAccountNumber,
   saveMappings,
   type AccountMapping,
   type Config,
 } from "../config/config.js";
-import type { ActualAccount } from "../services/actual.js";
+import type { LedgerAccount } from "../ledger/ledger.js";
+import type { CounterpartyCandidate } from "../import/account-mapping.js";
 import {
   formatAccountNumber,
-  type CounterpartyCandidate,
-} from "../services/account-mapping.js";
+  normalizeAccountNumber,
+} from "../domain/account-number.js";
 
 export function canPrompt(): boolean {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);
@@ -17,7 +17,7 @@ export function canPrompt(): boolean {
 
 async function pickAccount(
   message: string,
-  accounts: ActualAccount[]
+  accounts: LedgerAccount[]
 ): Promise<string | undefined> {
   const choice = await p.select({
     message,
@@ -31,7 +31,7 @@ export async function promptSourceMapping(
   config: Config,
   accountNumber: string,
   bank: string,
-  accounts: ActualAccount[]
+  accounts: LedgerAccount[]
 ): Promise<AccountMapping | undefined> {
   const actualAccountId = await pickAccount(
     `Bank account ${formatAccountNumber(accountNumber)} (${bank}) isn't mapped yet. Which Actual account is it?`,
@@ -58,7 +58,7 @@ export async function promptSourceMapping(
 export async function promptCounterpartyMappings(
   config: Config,
   candidates: CounterpartyCandidate[],
-  accounts: ActualAccount[],
+  accounts: LedgerAccount[],
   limit = 10
 ): Promise<void> {
   const shown = candidates.slice(0, limit);

@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ErsteParser } from "../../parsers/erste/index.js";
-import { getParser } from "../../parsers/registry.js";
+import { ErsteParser } from "./index.js";
+import { getParser } from "../registry.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixturePath = join(__dirname, "../fixtures/erste-sample.csv");
+const fixturePath = join(__dirname, "fixtures/sample.csv");
 
 describe("ErsteParser", () => {
   const parser = new ErsteParser();
@@ -70,5 +70,12 @@ describe("ErsteParser", () => {
   it("should return empty transactions for empty content", () => {
     const result = parser.parse("");
     expect(result.transactions).toHaveLength(0);
+  });
+
+  it("reports the row of a malformed amount instead of importing NaN", () => {
+    const csv =
+      '06-11-2026,01-11-2026,"\'11 0000 2222 3333 4444 5555 6666",X,PLN,0,0,1\n' +
+      '05-11-2026,05-11-2026,"Title","Shop","",abc,"0,00",1\n';
+    expect(() => parser.parse(csv)).toThrow(/Erste CSV, data row 1: invalid amount 'abc'/);
   });
 });

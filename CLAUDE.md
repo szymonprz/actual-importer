@@ -37,13 +37,13 @@ Adding a new parser also requires registering it in `src/parsers/registry.ts` (2
 
 ### Key Domain Logic
 
-- **Transfer detection:** if a transaction's `counterpartyAccount` matches a configured `bankAccountNumber`, it becomes an Actual Budget transfer. Transfers are created by setting `payee` to the target account's transfer payee — never write `transfer_id` directly (it's a transaction id, not an account id). If the other side already exists unlinked in the target account, the importer links the two (`src/services/transfer-matcher.ts`)
+- **Transfer detection:** if a transaction's `counterpartyAccount` matches a configured `bankAccountNumber`, it becomes an Actual Budget transfer. Transfers are created by setting `payee` to the target account's transfer payee — never write `transfer_id` directly (it's a transaction id, not an account id). If the other side already exists unlinked in the target account, the importer links the two (`src/import/transfer-matcher.ts`)
 - **Deduplication:** `imported_id = SHA256(date + "|" + amount + "|" + description + "|" + bankAccountNumber)`; the 2nd, 3rd… identical transaction in a statement appends `"|" + occurrence` (`computeImportedIds`), so same-day duplicates like two ATM withdrawals stay distinct while first-occurrence IDs never change
 - **Dry-run:** executes all logic except API writes; summary prefixed with `[DRY RUN]`
 
 ### Actual Budget API
 
-- Amounts are in **integer cents** (e.g. $12.30 = 1230). Use `amountToInteger()` from `src/services/actual.ts`.
+- Amounts are in **integer cents** (e.g. $12.30 = 1230). Use `toCents()` from `src/domain/money.ts`.
 - `importTransactions()` returns `{ added, updated, errors }` — deduplication is handled by Actual via `imported_id`.
 - ING CSVs are CP1250-encoded and use semicolons as delimiters. Erste (formerly Santander) CSVs are UTF-8 with comma delimiters.
 

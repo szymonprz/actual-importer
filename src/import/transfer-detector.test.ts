@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { detectTransfer } from "../../services/transfer-detector.js";
-import type { Transaction } from "../../parsers/types.js";
-import type { AccountMapping } from "../../config/config.js";
+import { detectTransfer } from "./transfer-detector.js";
+import type { Transaction } from "../domain/transaction.js";
+import type { AccountMapping } from "../config/config.js";
 
 const mappings: AccountMapping[] = [
   {
@@ -69,5 +69,19 @@ describe("detectTransfer", () => {
     const result = detectTransfer(tx, mappings);
     expect(result.isTransfer).toBe(true);
     expect(result.targetActualAccountId).toBe("acc-santander-1");
+  });
+
+  it("matches an IBAN-style counterparty (PL prefix) against a plain NRB mapping", () => {
+    const tx: Transaction = {
+      date: "2026-04-01",
+      amount: -7000,
+      payee: "Jan Testowy",
+      description: "Przelew",
+      counterpartyAccount: "PL99000011112222333344445555",
+    };
+
+    expect(detectTransfer(tx, mappings).targetActualAccountId).toBe(
+      "acc-santander-1"
+    );
   });
 });

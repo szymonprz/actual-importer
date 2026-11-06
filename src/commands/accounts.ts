@@ -1,6 +1,6 @@
 import { loadConfig, type Config } from "../config/config.js";
-import { connect, disconnect, getAccounts } from "../services/actual.js";
-import { formatAccountNumber } from "../services/account-mapping.js";
+import { withBudget } from "../ledger/actual.js";
+import { formatAccountNumber } from "../domain/account-number.js";
 
 export async function accountsCommand(): Promise<void> {
   let config: Config;
@@ -12,8 +12,7 @@ export async function accountsCommand(): Promise<void> {
   }
 
   try {
-    await connect(config);
-    const accounts = await getAccounts();
+    const accounts = await withBudget(config, (ledger) => ledger.getAccounts());
 
     console.log("\nActual Budget accounts:\n");
     for (const account of accounts) {
@@ -31,7 +30,5 @@ export async function accountsCommand(): Promise<void> {
       error instanceof Error ? error.message : error
     );
     process.exitCode = 1;
-  } finally {
-    await disconnect();
   }
 }

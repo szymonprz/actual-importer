@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeImportedId, computeImportedIds } from "../../services/deduplication.js";
+import { computeImportedId, computeImportedIds } from "./deduplication.js";
 
 describe("computeImportedId", () => {
   it("should return a deterministic SHA-256 hash", () => {
