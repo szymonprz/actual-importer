@@ -6,23 +6,15 @@ import {
 } from "../services/account-mapping.js";
 import { canPrompt, promptCounterpartyMappings, promptSourceMapping } from "./mapping-prompts.js";
 import { getParser, getAvailableBankIds } from "../parsers/registry.js";
+import type { ParseResult } from "../parsers/types.js";
 import { computeImportedIds } from "../services/deduplication.js";
 import { detectTransfer } from "../services/transfer-detector.js";
-import {
-  connect,
-  disconnect,
-  getAccounts,
-  getTransferPayees,
-  findTransactions,
-  findByImportedIds,
-  importTransactions,
-  linkTransfer,
-  updateTransaction,
-} from "../services/actual.js";
+import { withBudget } from "../ledger/actual.js";
 import type {
-  ActualTransaction,
   ExistingTransaction,
-} from "../services/actual.js";
+  Ledger,
+  NewTransaction as ActualTransaction,
+} from "../ledger/ledger.js";
 import {
   pickCounterpart,
   TRANSFER_DATE_WINDOW_DAYS,
@@ -73,7 +65,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
   }
 
   // Parse transactions
-  let parsed;
+  let parsed: ParseResult;
   try {
     parsed = parser.parse(csvData);
   } catch (error) {
@@ -105,12 +97,30 @@ export async function importCommand(args: ImportArgs): Promise<void> {
   try {
     // Connect in dry-run too: it's read-only and lets us report exactly what
     // would be skipped, and which transfers would be linked vs. created.
-    await connect(config);
+    await withBudget(config, (ledger) =>
+      runImport(ledger, config, parsed, args, summary)
+    );
+  } catch (error) {
+    console.error(
+      "Failed to import transactions:",
+      error instanceof Error ? error.message : error
+    );
+    process.exitCode = 1;
+  }
+}
 
-    const accounts = await getAccounts();
+async function runImport(
+  ledger: Ledger,
+  config: Config,
+  parsed: ParseResult,
+  args: ImportArgs,
+  summary: ImportSummary
+): Promise<void> {
+  {
+    const accounts = await ledger.getAccounts();
     const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
     const accountIds = new Set(accountNames.keys());
-    const transferPayees = await getTransferPayees();
+    const transferPayees = await ledger.getTransferPayees();
 
     // Map the CSV's own account, asking the user if it's new.
     const sourceAccountNumber = parsed.sourceAccountNumber;
@@ -161,7 +171,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
       transfer: detectTransfer(tx, config.accountMappings),
     }));
 
-    const alreadyImported = await findByImportedIds(
+    const alreadyImported = await ledger.findByImportedIds(
       sourceAccountId,
       planned.map((p) => p.importedId)
     );
@@ -194,7 +204,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
         // a duplicate.
         const autoCreated = isNew
           ? (
-              await findTransactions({
+              await ledger.findTransactions({
                 account: sourceAccountId,
                 amount: p.amount,
                 dateFrom: shiftDate(p.tx.date, -TRANSFER_DATE_WINDOW_DAYS),
@@ -218,7 +228,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
         const counterpart = isNew
           ? pickCounterpart(
               { date: p.tx.date, amount: p.amount },
-              await findTransactions({
+              await ledger.findTransactions({
                 account: target,
                 amount: -p.amount,
                 dateFrom: shiftDate(p.tx.date, -TRANSFER_DATE_WINDOW_DAYS),
@@ -256,7 +266,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
     }
 
     for (const { id, tx } of adoptions) {
-      await updateTransaction(id, {
+      await ledger.updateTransaction(id, {
         imported_id: tx.imported_id,
         imported_payee: tx.imported_payee,
         cleared: true,
@@ -264,7 +274,7 @@ export async function importCommand(args: ImportArgs): Promise<void> {
       summary.skipped++;
     }
 
-    const result = await importTransactions(sourceAccountId, actualTransactions);
+    const result = await ledger.importTransactions(sourceAccountId, actualTransactions);
     summary.imported += result.added.length;
     summary.skipped += actualTransactions.length - result.added.length;
     for (const error of result.errors) {
@@ -273,17 +283,16 @@ export async function importCommand(args: ImportArgs): Promise<void> {
 
     if (pendingLinks.size > 0) {
       const added = new Set(result.added);
-      const newIds = await findByImportedIds(sourceAccountId, [
+      const newIds = await ledger.findByImportedIds(sourceAccountId, [
         ...pendingLinks.keys(),
       ]);
       for (const [importedId, counterpart] of pendingLinks) {
         const id = newIds.get(importedId);
         if (!id || !added.has(id)) continue;
         try {
-          await linkTransfer(
+          await ledger.linkTransfer(
             { id: counterpart.id, account: counterpart.account },
-            { id, account: sourceAccountId },
-            transferPayees
+            { id, account: sourceAccountId }
           );
         } catch (error) {
           summary.errors.push(
@@ -295,14 +304,6 @@ export async function importCommand(args: ImportArgs): Promise<void> {
 
     printTransfers(transferLines);
     console.log(formatSummary(summary, false));
-  } catch (error) {
-    console.error(
-      "Failed to import transactions:",
-      error instanceof Error ? error.message : error
-    );
-    process.exitCode = 1;
-  } finally {
-    await disconnect();
   }
 }
 

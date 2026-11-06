@@ -11,13 +11,7 @@ import {
   upsertDotEnv,
   type ConnectionConfig,
 } from "../config/config.js";
-import {
-  connect,
-  disconnect,
-  getAccounts,
-  listBudgets,
-  type RemoteBudget,
-} from "../services/actual.js";
+import { listBudgets, withBudget, type RemoteBudget } from "../ledger/actual.js";
 
 function exitIfCancel<T>(value: T): Exclude<T, symbol> {
   if (p.isCancel(value)) {
@@ -81,10 +75,8 @@ export async function setupCommand(): Promise<void> {
   } catch (error) {
     spinner.stop("Login failed");
     p.log.error(error instanceof Error ? error.message : String(error));
-    await disconnect();
     process.exit(1);
   }
-  await disconnect();
 
   if (budgets.length === 0) {
     p.log.error("No budgets found on this server.");
@@ -172,15 +164,12 @@ async function testConnection(conn: ConnectionConfig): Promise<boolean> {
   const spinner = p.spinner();
   spinner.start("Opening budget...");
   try {
-    await connect(conn);
-    const accounts = await getAccounts();
+    const accounts = await withBudget(conn, (ledger) => ledger.getAccounts());
     spinner.stop(`Budget opened — ${accounts.length} accounts`);
     return true;
   } catch (error) {
     spinner.stop("Could not open budget");
     p.log.error(error instanceof Error ? error.message : String(error));
     return false;
-  } finally {
-    await disconnect();
   }
 }

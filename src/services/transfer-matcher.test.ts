@@ -3,7 +3,7 @@ import {
   pickCounterpart,
   isUnlinked,
 } from "./transfer-matcher.js";
-import type { ExistingTransaction } from "./actual.js";
+import type { ExistingTransaction } from "../ledger/ledger.js";
 
 const ACCOUNTS = new Set(["acct-ing", "acct-santander"]);
 

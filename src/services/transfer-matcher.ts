@@ -1,4 +1,4 @@
-import type { ExistingTransaction } from "./actual.js";
+import type { ExistingTransaction } from "../ledger/ledger.js";
 import { daysBetween } from "../domain/dates.js";
 
 export const TRANSFER_DATE_WINDOW_DAYS = 3;
