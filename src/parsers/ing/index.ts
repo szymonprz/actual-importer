@@ -31,6 +31,13 @@ function extractSourceAccount(lines: string[]): string {
 /** ING Bank Śląski — CP1250, semicolon-delimited, metadata block before the data. */
 export class IngParser implements BankParser {
   bankId = "ing";
+  displayName = "ING Bank Śląski";
+
+  detect(content: Buffer): boolean {
+    return decode(content.subarray(0, 8192), "cp1250")
+      .split("\n")
+      .some((line) => line.startsWith(`"${DATA_ROW_START_MARKER}";`));
+  }
 
   parse(csvContent: string | Buffer): ParseResult {
     const lines = decode(csvContent, "cp1250").split("\n");

@@ -19,7 +19,7 @@ actual-importer is a CLI tool (Node.js + TypeScript) that imports bank transacti
 ### CLI Commands
 
 - `setup` — interactive wizard for the connection (server URL, password, budget picked from a list, E2E password); saves to the JSON config or `./.env`
-- `import --file <path> --bank <id> [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--dry-run] [--json]` — parse CSV, detect transfers, deduplicate, and import. Prompts (interactive only) to map an unmapped source account and frequent unmapped counterparty accounts
+- `import --file <path> [--bank <id>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--dry-run] [--json]` — parse CSV, detect transfers, deduplicate, and import. Prompts (interactive only) to map an unmapped source account and frequent unmapped counterparty accounts
 - `accounts [--json]` — list Actual Budget accounts and their mapped bank accounts
 - `map <bank-account> [<actual account id|name>] [--bank id] [--ignore] [--remove]` — non-interactive mapping
 - Global: `--no-input` disables prompts; `--json` implies it. Prompts also need a TTY.
@@ -28,16 +28,7 @@ Each command is a `defineCommand({...})` module in `src/commands/`, registered i
 
 ### Bank Parser Interface
 
-Parsers live in `src/parsers/<bankId>/` and implement the `BankParser` interface. Adding a new bank requires only creating a new parser directory — no core logic changes needed.
-
-```typescript
-interface BankParser {
-  bankId: string;
-  parse(csvContent: string | Buffer): Transaction[];
-}
-```
-
-Adding a new parser also requires registering it in `src/parsers/registry.ts` (2 lines: import + `register()` call).
+Parsers live in `src/parsers/<bankId>/index.ts`, implement `BankParser` (`src/parsers/types.ts`: `bankId`, `displayName`, `aliases?`, `detect(buffer)`, `parse(content) → { sourceAccountNumber, transactions }`) and are listed in `src/parsers/registry.ts`. `--bank` is optional: the parser whose `detect()` matches is used. Each parser needs `fixtures/sample.csv`; `src/parsers/contract.test.ts` checks every registered parser against it. Step-by-step guide: `CONTRIBUTING.md`.
 
 ### Key Domain Logic
 

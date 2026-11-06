@@ -12,6 +12,15 @@ function parseDate(raw: string): string {
 /** Erste Bank Polska (formerly Santander Bank Polska) — same CSV format. */
 export class ErsteParser implements BankParser {
   bankId = "erste";
+  displayName = "Erste Bank Polska (formerly Santander Bank Polska)";
+  // Santander Bank Polska was renamed to Erste; keep the old id working.
+  aliases = ["santander"];
+
+  detect(content: Buffer): boolean {
+    // Metadata row: generation date (ISO), period start (DD-MM-YYYY), account number, …
+    const firstLine = decode(content.subarray(0, 1024), "utf-8").split("\n")[0];
+    return /^\d{4}-\d{2}-\d{2},\d{2}-\d{2}-\d{4},"?'?[\d ]{26,32}"?,/.test(firstLine);
+  }
 
   parse(csvContent: string | Buffer): ParseResult {
     const records = readRows(decode(csvContent, "utf-8"), ",");
